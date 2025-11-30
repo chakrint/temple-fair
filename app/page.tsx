@@ -2,201 +2,140 @@
 
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-// ✅ ยังใช้ TwinklingStars ได้ครับ พอมันอยู่บนพื้นหลังสว่าง จะดูเหมือนประกายวิบวับน่ารักๆ
 import TwinklingStars from "./TwinklingStars"; 
-// ✅ เปลี่ยนไอคอนใหม่หมดให้เป็นแนวของเล่น น่ารักๆ
-import { Sparkles, Wallet, Gift, Puzzle, Rocket, Star, Smile, Baby, Gamepad2, Globe, LogOut } from "lucide-react";
+import { 
+  Sparkles, Wallet, LogOut, Star, 
+  Cloud, Candy, Flame, Stethoscope, // Common
+  Cat, Bird, Sprout, // Rare (ใช้ Cat แทน Bear, Bird แทน Duck แก้ขัด icon)
+  Rocket, Zap, Crown, // Legendary
+  Hand // Icon มือ
+} from "lucide-react";
 
-// --- 1. Blockchain Config (เหมือนเดิม) ---
-const GAME_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
-const TOKEN_ADDRESS = "0x8a26fA986f360EA0B7CDad1E15C5698786b582BC"; 
-const TICKET_PRICE = "100"; 
+// --- 1. Blockchain Config ---
+const CONTRACT_ADDRESS = "0xf8e81D47203A594245E36C48e151709F0C19fBe8"; // ✅ ตู้ Star Catcher ของคุณ
 
-// ABI (เหมือนเดิม)
-const GAME_ABI = [
-  "function enterGame() external",
-  "function refund() external",
-  "function players(uint256) view returns (address)",
-  "function getPlayersCount() view returns (uint256)" 
-];
-const TOKEN_ABI = [
-  "function approve(address spender, uint256 amount) external returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function balanceOf(address account) view returns (uint256)"
+const CONTRACT_ABI = [
+  "function catchStar() external"
 ];
 
-// --- 2. คำศัพท์ฉบับ "Toyland Theme" (น่ารัก สดใส ไม่ใช่การพนัน) ---
-const translations = {
-  th: {
-    title: "Toyland", titleSuffix: "Adventure", subtitle: "สะสมของเล่นสุดมหัศจรรย์บน World Chain!",
-    connect: "เชื่อมต่อกระเป๋าของเล่น", verified: "ยืนยันตัวหนูแล้ว", disconnect: "กลับบ้าน",
-    adminHall: "กล่องเก็บของเล่นหนู", coinName: "เหรียญของเล่น (TOY COIN)",
-    exchangeTitle: "เติมเหรียญเพิ่ม", rate: "แลกเหรียญที่ PUF.io นะ", swapBtn: "ไปแลกเหรียญ",
-    
-    gameTitle: "ภารกิจตามหาของเล่น", round: "ด่านที่ ๘๙", waiting: "รอเพื่อนๆ...",
-    labelLuckyNum: "ปุ่มกด", labelTaken: "เพื่อนกดแล้ว", 
-    priceLabel: "ใช้ 100 เหรียญ",
-
-    rewardTitle: "✨ ของเล่นในตำนานประจำด่าน ✨",
-    prize1: "รางวัลใหญ่สุด", prize1Name: "หุ่นยนต์ยักษ์โรโบ", // Giant Robot
-    prize2: "รางวัลรอง", prize2Name: "ตุ๊กตาหมีซุปเปอร์", // Super Teddy Bear
-    prize3: "รางวัลสาม", prize3Name: "ชุดตัวต่อวิเศษ", // Magic Puzzle Set
-    
-    valuePrefix: "มูลค่า", unit: "เหรียญ",
-    consolationTitle: "ของรางวัลปลอบใจน่ารักๆ", consolationItems: "🍭 ลูกอมสายรุ้ง / 🧸 สติ๊กเกอร์หมี / 🎈 ลูกโป่งวิเศษ",
-    
-    logTitle: "สถานะตู้ของเล่น",
-    modalTitle: "จะกดปุ่มนี้เหรอ?", modalDesc: "หนูต้องการใช้เหรียญกดปุ่มหมายเลข", modalCost: "ต้องใช้: 100 เหรียญของเล่น",
-    btnCancel: "ไมเอาดีกว่า", btnConfirm: "กดเลย! (จ่าย 100)", 
-    approving: "กำลังหยอดเหรียญ...", processing: "ตู้กำลังทำงาน...",
-    errNoMoney: "เหรียญไม่พอจ้า! ไปหาเหรียญของเล่นมาเพิ่มก่อนนะ 🪙",
-    errWrongNet: "⚠️ ผิดที่แล้ว! กลับไปที่ World Chain ก่อนนะเด็กดี"
+// --- 2. ข้อมูลของสะสม & คำอวยพร (10 อย่าง) ---
+const REWARDS_DB = [
+  // 🟢 Common (ID 1-4)
+  { id: 1, type: 'common', icon: Cloud, color: 'text-blue-300', 
+    name: { th: "หมอนเมฆนุ่มนิ่ม", en: "Cloud Pillow" },
+    desc: { th: "ขอให้คืนนี้หลับฝันดี ทิ้งความกังวลไว้ข้างหลัง พรุ่งนี้จะเป็นวันที่สดใสของคุณแน่นอน", en: "Sweet dreams tonight. Leave your worries behind, tomorrow will be bright." } 
   },
-  en: {
-    title: "Toyland", titleSuffix: "Adventure", subtitle: "Collect magical toys on World Chain!",
-    connect: "Connect Toy Wallet", verified: "Verified Kid", disconnect: "Go Home",
-    adminHall: "My Toy Box", coinName: "Toy Coins ($SLG)",
-    exchangeTitle: "Get More Coins", rate: "Swap at PUF.io", swapBtn: "Go Swap",
-    
-    gameTitle: "Toy Hunt Mission", round: "Level 89", waiting: "Waiting for friends...",
-    labelLuckyNum: "Button", labelTaken: "Taken!", 
-    priceLabel: "Use 100 Coins",
+  { id: 2, type: 'common', icon: Candy, color: 'text-pink-400', 
+    name: { th: "ลูกอมรสแสงดาว", en: "Starlight Candy" },
+    desc: { th: "เติมความหวานให้ชีวิตสักนิด ยิ้มเข้าไว้นะ วันนี้คุณเก่งมากแล้วรู้ไหม?", en: "Add some sweetness to life. Keep smiling, you did great today!" } 
+  },
+  { id: 3, type: 'common', icon: Flame, color: 'text-orange-300', 
+    name: { th: "เทียนหอมอุ่นใจ", en: "Cozy Candle" },
+    desc: { th: "แม้ในคืนที่มืดมิดที่สุด แสงสว่างดวงเล็กๆ จากความหวัง จะคอยเป็นเพื่อนคุณเสมอ", en: "Even in the darkest night, a small light of hope will always be with you." } 
+  },
+  { id: 4, type: 'common', icon: Stethoscope, color: 'text-red-300', // ใช้ Stethoscope แทน Plaster
+    name: { th: "พลาสเตอร์วิเศษ", en: "Magic Plaster" },
+    desc: { th: "เป่าเพี้ยง! ความเจ็บปวดจงหายไป ขอให้หัวใจของคุณกลับมาแข็งแรงไวๆ นะ", en: "Pain, pain go away! May your heart be strong and heal quickly." } 
+  },
+  // 🔵 Rare (ID 5-7)
+  { id: 5, type: 'rare', icon: Cat, color: 'text-yellow-600', // ใช้ Cat แทน Bear
+    name: { th: "หมีน้อยนักบิน", en: "Pilot Bear" },
+    desc: { th: "กัปตันหมีรายงานตัว! ไม่ว่าจะเจอพายุลูกใหญ่แค่ไหน ผมจะนั่งข้างๆ คุณเอง", en: "Captain Bear reporting! No matter the storm, I'll sit right by your side." } 
+  },
+  { id: 6, type: 'rare', icon: Bird, color: 'text-yellow-300', // ใช้ Bird แทน Duck
+    name: { th: "เป็ดก๊าบอวกาศ", en: "Space Ducky" },
+    desc: { th: "ลอยตุ๊บป่องแบบชิลๆ บางเรื่องในชีวิต ปล่อยเบลอบ้างก็ได้นะ", en: "Floating casually... Sometimes it's okay to just let things be." } 
+  },
+  { id: 7, type: 'rare', icon: Sprout, color: 'text-green-400', 
+    name: { th: "ต้นกล้ากาแล็กซี", en: "Galaxy Sprout" },
+    desc: { th: "ความฝันของคุณกำลังเติบโต รดน้ำด้วยความตั้งใจ แล้วรอดูวันที่มันบานสะพรั่งนะ", en: "Your dreams are growing. Water them with care and watch them bloom." } 
+  },
+  // 🟡 Legendary (ID 8-10)
+  { id: 8, type: 'legendary', icon: Rocket, color: 'text-purple-500', 
+    name: { th: "ยานอวกาศ DIY", en: "DIY Spaceship" },
+    desc: { th: "ไม่มีฝันไหนใหญ่เกินเอื้อม! ยานลำนี้สร้างด้วยมือและหัวใจ มันจะพาคุณบินไปได้ไกลเท่าที่ใจฝัน", en: "No dream is too big! Built with heart, this ship will take you as far as you dare to dream." } 
+  },
+  { id: 9, type: 'legendary', icon: Zap, color: 'text-yellow-500', // ใช้ Zap แทน Dragon (พลัง)
+    name: { th: "มังกรน้อยเฝ้าทรัพย์", en: "Baby Gold Dragon" },
+    desc: { th: "พลังมังกรทองสถิต! เตรียมตัวรับความโชคดีและความมั่งคั่งที่กำลังพุ่งชนคุณอย่างจัง!", en: "Gold Dragon Power! Get ready for luck and prosperity coming your way!" } 
+  },
+  { id: 10, type: 'legendary', icon: Crown, color: 'text-yellow-400', 
+    name: { th: "มงกุฎดวงดาว", en: "Stardust Crown" },
+    desc: { th: "จงภูมิใจในตัวเอง เชื่อมั่นในคุณค่าที่มี เพราะคุณคือราชาในโลกของคุณเองเสมอ", en: "Be proud of who you are. You are always the ruler of your own world." } 
+  },
+];
 
-    rewardTitle: "✨ Legendary Toys of the Level ✨",
-    prize1: "Top Prize", prize1Name: "Giant Robo-Rex",
-    prize2: "2nd Prize", prize2Name: "Super Teddy Bear",
-    prize3: "3rd Prize", prize3Name: "Magic Puzzle Set",
-    
-    valuePrefix: "Value", unit: "Coins",
-    consolationTitle: "Cute Consolation Prizes", consolationItems: "🍭 Rainbow Pop / 🧸 Bear Sticker / 🎈 Magic Balloon",
-    
-    logTitle: "Toy Machine Status",
-    modalTitle: "Press this button?", modalDesc: "You are using coins to press button number", modalCost: "Cost: 100 Toy Coins",
-    btnCancel: "No thanks", btnConfirm: "Press it! (Pay 100)", 
-    approving: "Inserting coin...", processing: "Machine is working...",
-    errNoMoney: "Not enough Toy Coins! Go find some more.",
-    errWrongNet: "⚠️ Wrong place! Switch back to World Chain, kiddos."
-  }
-};
-
-export default function SalungTempleApp() {
-  const [lang, setLang] = useState<"th" | "en">("en"); // เริ่มต้น EN เพื่อความปลอดภัยตอนตรวจ
-  const t = translations[lang];
-
-  // Web3 State (เหมือนเดิม)
-  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
-  const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
+export default function StarCatcherApp() {
+  const [lang, setLang] = useState<"th" | "en">("en");
   const [userAddress, setUserAddress] = useState("");
-  const [salungBalance, setSalungBalance] = useState("0");
-  const [wldBalance, setWldBalance] = useState("0");
   const [statusMsg, setStatusMsg] = useState(""); 
-
-  // Game UI State
-  const [players, setPlayers] = useState<number[]>([]); 
-  const [showModal, setShowModal] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [reward, setReward] = useState<any>(null);
 
-  const luckyNumbers = [999, 168, 789, 888, 456, 111, 234, 555, 987, 123, 777, 654];
+  // สร้างตำแหน่งดาว 20 ดวง (สุ่มตำแหน่ง)
+  const [stars, setStars] = useState<{id: number, x: number, y: number, size: number}[]>([]);
 
-  // 1. Connect Wallet Logic (เหมือนเดิม)
+  useEffect(() => {
+    // Generate Stars positions once
+    const newStars = Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 80 + 10, // 10% - 90%
+      y: Math.random() * 60 + 10,
+      size: Math.random() * 1.5 + 1 // Scale size
+    }));
+    setStars(newStars);
+  }, []);
+
   const handleConnect = async () => {
     if ((window as any).ethereum) {
       try {
-        const _provider = new ethers.BrowserProvider((window as any).ethereum);
-        const _signer = await _provider.getSigner();
-        const _address = await _signer.getAddress();
-        
-        setProvider(_provider);
-        setSigner(_signer);
-        setUserAddress(_address);
-        
-        fetchBalances(_signer, _address);
-      } catch (err) {
-        console.error("Connect error:", err);
-        alert("Connection Failed");
-      }
-    } else {
-      alert("Please install World App Wallet or MetaMask!");
-    }
+        const provider = new ethers.BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+        const address = await signer.getAddress();
+        setUserAddress(address);
+      } catch (err) { alert("Connection Failed"); }
+    } else { alert("Please install Wallet!"); }
   };
 
-  const handleDisconnect = () => {
-    setProvider(null);
-    setSigner(null);
-    setUserAddress("");
-    setSalungBalance("0");
-    setWldBalance("0");
-    alert("Bye bye!");
-  };
+  const handleDisconnect = () => setUserAddress("");
+  const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
 
-  const fetchBalances = async (signer: any, address: string) => {
-    try {
-        const ethBal = await signer.provider.getBalance(address);
-        setWldBalance(parseFloat(ethers.formatEther(ethBal)).toFixed(4)); 
-
-        const tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
-        const slgBal = await tokenContract.balanceOf(address);
-        setSalungBalance(parseFloat(ethers.formatEther(slgBal)).toLocaleString());
-    } catch (e) {
-        console.log("Error fetching balance", e);
-    }
-  };
-
-  // 2. Buy Ticket Logic (เหมือนเดิม)
-  const confirmPurchase = async () => {
-    if (!signer || selectedSlot === null) return;
+  // ฟังก์ชันจับดาว
+  const catchStar = async () => {
+    if (!userAddress) { handleConnect(); return; }
     setIsProcessing(true);
-    setStatusMsg(t.approving);
+    setStatusMsg(lang === 'th' ? "กำลังเอื้อมมือไปจับ..." : "Reaching for the stars...");
 
     try {
-      const network = await provider?.getNetwork();
-      if (network?.chainId !== 480n) { 
-         alert(t.errWrongNet);
-         setIsProcessing(false);
-         setStatusMsg("");
-         return;
-      }
+      // 1. เรียก Blockchain
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-      const tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
-      const gameContract = new ethers.Contract(GAME_ADDRESS, GAME_ABI, signer);
-      
-      const priceWei = ethers.parseEther(TICKET_PRICE);
-      const myBalance = await tokenContract.balanceOf(userAddress);
-      
-      if (myBalance < priceWei) {
-        alert(t.errNoMoney);
-        setIsProcessing(false);
-        setStatusMsg("");
-        return; 
-      }
+      const tx = await contract.catchStar();
+      setStatusMsg(lang === 'th' ? "จับได้แล้ว! กำลังแกะของขวัญ..." : "Star caught! Opening...");
+      await tx.wait();
 
-      const allowance = await tokenContract.allowance(userAddress, GAME_ADDRESS);
-      
-      if (allowance < priceWei) {
-        setStatusMsg(lang === "th" ? "กำลังหยอดเหรียญ..." : "Approving...");
-        const txApprove = await tokenContract.approve(GAME_ADDRESS, priceWei);
-        await txApprove.wait(); 
-      }
+      // 2. จำลองการสุ่มของรางวัลหน้าบ้าน (เพื่อให้ UI แสดงผลทันที)
+      // (ของจริง User ได้ NFT เข้ากระเป๋าไปแล้วตาม Logic Contract)
+      const rand = Math.floor(Math.random() * 100);
+      let selectedId = 1;
+      if (rand < 60) selectedId = Math.floor(Math.random() * 4) + 1; // Common 1-4
+      else if (rand < 90) selectedId = Math.floor(Math.random() * 3) + 5; // Rare 5-7
+      else selectedId = Math.floor(Math.random() * 3) + 8; // Legendary 8-10
 
-      setStatusMsg(t.processing);
-      const txEnter = await gameContract.enterGame();
-      await txEnter.wait();
-
-      alert("Yay! You pressed the button! 🎉");
-      setPlayers([...players, selectedSlot]); 
-      fetchBalances(signer, userAddress); 
-      setShowModal(false);
-      setSelectedSlot(null);
+      const item = REWARDS_DB.find(r => r.id === selectedId);
+      setReward(item);
+      setShowModal(true);
 
     } catch (err: any) {
       console.error(err);
-      if (err.code === "BAD_DATA" || err.message?.includes("could not decode")) {
-         alert("Oops! Wrong network. Please use World Chain.");
-      } else if (err.reason) {
-         alert("Error: " + err.reason);
+      const msg = err.reason || err.message;
+      if (msg.includes("cooldown")) {
+        alert(lang === 'th' ? "พักเหนื่อยก่อนนะ พรุ่งนี้ค่อยมาจับใหม่!" : "Please wait! Come back tomorrow.");
       } else {
-         alert("Something went wrong. Try again!");
+        alert("Oops! Something went wrong.");
       }
     } finally {
       setIsProcessing(false);
@@ -204,257 +143,149 @@ export default function SalungTempleApp() {
     }
   };
 
-  const handleBuyTicket = (index: number) => {
-    if (players.includes(index)) return; 
-    if (!userAddress) {
-        handleConnect();
-        return;
-    }
-    setSelectedSlot(index);
-    setShowModal(true);
-  };
-
-  const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
-
   return (
-    // ✅ พื้นหลังใหม่: ท้องฟ้าสดใส (Blue Gradient) แทนสีดำ
-    // ✅ ฟอนต์ใหม่: ใช้ sans-serif (เช่น ui-sans-serif, system-ui) ให้ดูนุ่มนวลขึ้น
-    <div className="min-h-screen bg-gradient-to-b from-blue-300 via-blue-200 to-pink-100 text-blue-900 font-sans selection:bg-pink-300 selection:text-white relative overflow-hidden">
+    // Cursor: Grab (มือแบ)
+    <div className="min-h-screen bg-gradient-to-b from-[#0f172a] via-[#1e1b4b] to-[#312e81] text-white font-sans relative overflow-hidden cursor-grab active:cursor-grabbing selection:bg-pink-500">
       
-      {/* ดาววิบวับ (บนพื้นสว่างจะดูเหมือนประกายเวทมนตร์) */}
       <TwinklingStars />
-      
-      {/* Navbar สไตล์ของเล่น (ขอบมนๆ สีสดใส) */}
-      <header className="relative z-10 border-b-[6px] border-pink-400 bg-white/80 backdrop-blur-md sticky top-0 shadow-lg rounded-b-[2rem] mx-2 mt-2">
-        <div className="max-w-4xl mx-auto px-6 h-20 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 animate-bounce-slow">
-            <div className="p-3 bg-gradient-to-tr from-yellow-300 to-orange-400 rounded-full border-4 border-white shadow-md">
-              <Gamepad2 size={28} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-pink-500 drop-shadow-sm" style={{ fontFamily: '"Comic Sans MS", "Arial Rounded MT Bold", sans-serif' }}>
-                {t.title}<span className="text-orange-500 ml-2">{t.titleSuffix}</span>
-              </h1>
-              <p className="text-sm text-blue-600/80 font-bold">{t.subtitle}</p>
-            </div>
+
+      {/* Navbar */}
+      <header className="relative z-20 p-6 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-white/10 rounded-full backdrop-blur-md border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+            <Star className="text-yellow-300 fill-yellow-300 animate-pulse" size={28} />
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={toggleLang} className="px-4 py-2 rounded-full bg-blue-100 border-4 border-blue-300 text-sm font-black text-blue-600 hover:bg-blue-200 transition-all flex items-center gap-2 shadow-sm hover:scale-105">
-              <Globe size={16} /> {lang === "th" ? "EN" : "TH"}
+          <div>
+            <h1 className="text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-pink-300 drop-shadow-sm">
+              Star<span className="text-white">Catcher</span>
+            </h1>
+            <p className="text-xs text-blue-200 tracking-wider uppercase opacity-80">
+              {lang === 'th' ? "คว้าดาว เก็บฝัน" : "Catch a falling star"}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex gap-3">
+            <button onClick={toggleLang} className="px-3 py-1 rounded-full border border-white/20 bg-white/5 hover:bg-white/20 text-xs font-bold transition-all">
+                {lang === 'th' ? "EN" : "TH"}
             </button>
             {!userAddress ? (
-              <button onClick={handleConnect} className="hidden md:flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-blue-500 text-white font-black rounded-full hover:from-green-500 hover:to-blue-600 transition-all shadow-md border-4 border-white text-sm hover:scale-105 hover:-rotate-2">
-                <Wallet size={20} /> {t.connect}
-              </button>
+            <button onClick={handleConnect} className="px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-transform border border-white/20">
+                {lang === 'th' ? "เชื่อมต่อ" : "Connect"}
+            </button>
             ) : (
-              <button 
-                onClick={handleDisconnect}
-                className="group flex items-center gap-2 px-4 py-2 border-4 border-green-400 rounded-full bg-green-100 hover:bg-red-100 hover:border-red-400 transition-all cursor-pointer shadow-sm"
-                title="Click to Disconnect"
-              >
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse group-hover:bg-red-500"></div>
-                <span className="text-green-700 text-sm font-black hidden md:inline group-hover:hidden">
-                    {userAddress.slice(0,6)}...
-                </span>
-                <span className="text-red-600 text-sm font-black hidden group-hover:flex items-center gap-1">
-                    <LogOut size={16} /> {t.disconnect}
-                </span>
-              </button>
+            <button onClick={handleDisconnect} className="px-4 py-2 bg-white/10 rounded-full font-bold text-sm flex items-center gap-2 border border-white/20 hover:bg-red-500/20 group transition-all">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse group-hover:bg-red-400"></div>
+                {userAddress.slice(0,6)}... <LogOut size={14} className="hidden group-hover:block" />
+            </button>
             )}
-          </div>
         </div>
       </header>
 
-      <main className="relative z-10 max-w-4xl mx-auto px-4 py-8 space-y-8">
+      {/* Main Sky Area */}
+      <main className="relative z-10 w-full h-[80vh] flex flex-col items-center justify-center text-center">
         
-        {/* Dashboard (กล่องสไตล์ตัวต่อ Lego) */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-6 rounded-[2rem] bg-gradient-to-br from-blue-400 to-blue-300 border-[6px] border-white text-white relative overflow-hidden group shadow-xl hover:scale-[1.02] transition-transform">
-            <div className="absolute -right-8 -top-8 text-white/20 rotate-12"><Smile size={140} /></div>
-            <h2 className="text-blue-100 text-lg mb-2 flex items-center gap-2 font-black bg-blue-500/30 inline-block px-3 py-1 rounded-full">
-              <Baby size={20} /> {t.adminHall}
+        {/* Title */}
+        <div className="mb-12 pointer-events-none select-none">
+            <h2 className="text-4xl md:text-5xl font-black text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.5)] mb-4">
+                {lang === 'th' ? "อธิษฐาน แล้วคว้าดาวเลย!" : "Make a Wish & Catch a Star!"}
             </h2>
-            <div className="flex justify-between items-end relative z-10 mt-4">
-              <div>
-                <p className="text-5xl font-black drop-shadow-md" style={{ fontFamily: '"Comic Sans MS", sans-serif' }}>{salungBalance}</p>
-                <p className="text-blue-100 font-bold">{t.coinName}</p>
-              </div>
-              <div className="text-right bg-white/20 p-2 rounded-xl backdrop-blur-sm">
-                <p className="text-2xl font-black">{wldBalance}</p>
-                <p className="text-blue-100 text-sm font-bold">ETH Gas</p>
-              </div>
-            </div>
-          </div>
+            <p className="text-blue-200 text-lg max-w-md mx-auto leading-relaxed">
+                {lang === 'th' 
+                 ? "ดวงดาวแต่ละดวงซ่อนของขวัญและคำอวยพรไว้ กดที่ดาวดวงไหนก็ได้เพื่อรับพลังบวกกลับไปนะ" 
+                 : "Every star holds a gift and a blessing. Pick one to receive positive energy."}
+            </p>
+        </div>
 
-          <div className="p-6 rounded-[2rem] bg-gradient-to-br from-pink-400 to-orange-300 border-[6px] border-white text-white flex items-center justify-between shadow-xl relative overflow-hidden hover:scale-[1.02] transition-transform">
-             <div className="absolute -left-8 -bottom-8 text-white/20 -rotate-12"><Rocket size={140} /></div>
-            <div className="relative z-10">
-              <h2 className="text-white text-lg mb-2 flex items-center gap-2 font-black bg-pink-500/30 inline-block px-3 py-1 rounded-full">
-                <RefreshCw size={20} /> {t.exchangeTitle}
-              </h2>
-              <p className="text-sm text-white font-bold mb-4 bg-white/20 px-3 py-1 rounded-full inline-block">
-                {t.rate}
-              </p>
-              <a href="https://puf.io" target="_blank" rel="noopener noreferrer" className="block text-center px-6 py-3 bg-white text-pink-600 hover:bg-yellow-200 hover:text-orange-600 rounded-full text-lg font-black transition-all shadow-md border-4 border-pink-200 hover:scale-105 hover:rotate-2">
-                {t.swapBtn} 🚀
-              </a>
-            </div>
-          </div>
-        </section>
-
-        {/* Game Board (กระดานของเล่น) */}
-        <section className="space-y-6 bg-white/60 backdrop-blur-md p-6 rounded-[2.5rem] border-[8px] border-yellow-400 shadow-2xl relative overflow-hidden">
-          {/* พื้นหลังลายตัวการ์ตูนจางๆ */}
-          <div className="absolute inset-0 opacity-5 pointer-events-none flex items-center justify-center overflow-hidden">
-              <span className="text-[15rem]">🧸</span>
-          </div>
-          
-          <div className="flex items-center justify-between relative z-10">
-            <h2 className="text-2xl md:text-3xl font-black flex items-center gap-3 text-blue-700 drop-shadow-sm" style={{ fontFamily: '"Comic Sans MS", sans-serif' }}>
-              <Star size={32} className="text-yellow-500 fill-yellow-400 animate-spin-slow" />
-              {t.gameTitle} <span className="text-lg bg-blue-200 text-blue-700 px-3 py-1 rounded-full hidden md:inline">{t.round}</span>
-            </h2>
-            <div className="px-5 py-2 bg-gradient-to-r from-pink-500 to-orange-500 text-white border-4 border-white rounded-full text-sm md:text-base font-black shadow-md animate-bounce">
-              {t.waiting} ( {players.length} / 12 )
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-4 p-2 relative z-10">
-            {luckyNumbers.map((num, idx) => {
-              const isTaken = players.includes(idx);
-              return (
+        {/* Floating Stars (Buttons) */}
+        <div className="absolute inset-0 w-full h-full pointer-events-none">
+            {stars.map((star) => (
                 <button
-                  key={idx}
-                  onClick={() => handleBuyTicket(idx)}
-                  disabled={isTaken}
-                  className={`
-                    relative h-36 rounded-[1.5rem] border-[5px] flex flex-col items-center justify-center overflow-hidden transition-all duration-300 group shadow-lg
-                    ${isTaken 
-                      ? "bg-gray-200 border-gray-400 cursor-not-allowed opacity-80 grayscale" 
-                      : "bg-gradient-to-b from-yellow-200 to-orange-200 border-yellow-400 hover:border-blue-400 hover:from-blue-200 hover:to-purple-200 hover:shadow-xl hover:-translate-y-2 hover:rotate-2" 
-                    }
-                  `}
+                    key={star.id}
+                    onClick={catchStar}
+                    disabled={isProcessing}
+                    className="absolute pointer-events-auto transition-transform hover:scale-125 active:scale-90 group outline-none"
+                    style={{ 
+                        left: `${star.x}%`, 
+                        top: `${star.y}%`,
+                        animation: `float ${Math.random() * 3 + 3}s infinite ease-in-out`
+                    }}
                 >
-                  {/* ลบพื้นหลังมังกรออก ใส่เป็นไอคอนน่ารักๆ แทน */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden opacity-10">
-                     <span className="text-[8rem]">{isTaken ? '🔒' : '🎮'}</span>
-                  </div>
-
-                  {isTaken ? (
-                    <>
-                      <div className="w-16 h-16 bg-gray-300 rounded-full border-4 border-gray-400 flex items-center justify-center mb-2 relative z-10">
-                        <Baby size={32} className="text-gray-500" />
-                      </div>
-                      <span className="text-sm text-gray-600 font-black relative z-10 bg-gray-300 px-2 rounded-full">{t.labelTaken}</span>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-xs text-orange-600 mb-1 font-black uppercase tracking-widest relative z-10 bg-orange-100 px-3 py-0.5 rounded-full">
-                        {t.labelLuckyNum}
-                      </div>
-                      <div className="text-4xl md:text-5xl font-black relative z-10 text-blue-800 drop-shadow-sm group-hover:scale-110 transition-transform" style={{ fontFamily: '"Comic Sans MS", sans-serif' }}>
-                        {num}
-                      </div>
-                      <div className="mt-2 text-xs text-white bg-pink-500 px-3 py-1.5 rounded-full border-2 border-white relative z-10 shadow-sm whitespace-nowrap font-bold group-hover:bg-blue-500">
-                        {t.priceLabel}
-                      </div>
-                    </>
-                  )}
+                    {/* Star Icon */}
+                    <Star 
+                        size={24 * star.size} 
+                        className={`
+                            drop-shadow-[0_0_15px_rgba(255,255,0,0.6)]
+                            ${isProcessing ? 'text-gray-500 opacity-50' : 'text-yellow-200 fill-yellow-100 hover:text-white hover:fill-white'}
+                            transition-colors duration-300
+                        `} 
+                        strokeWidth={1.5}
+                    />
+                    {/* Hand Icon on Hover (Visual Feedback) */}
+                    <div className="opacity-0 group-hover:opacity-100 absolute -bottom-8 -right-4 transition-opacity duration-200 pointer-events-none">
+                        <Hand className="text-white drop-shadow-md rotate-[-20deg]" size={24} />
+                    </div>
                 </button>
-              );
-            })}
-          </div>
-        </section>
+            ))}
+        </div>
 
-        {/* Prizes Section (Safe Mode - Toy Style) */}
-        <section className="bg-white rounded-[2.5rem] border-[8px] border-blue-300 p-8 relative overflow-hidden shadow-xl text-blue-900">
-            <div className="text-center text-2xl text-blue-700 font-black uppercase tracking-wider mb-8 bg-blue-100 inline-block px-6 py-2 rounded-full mx-auto block shadow-sm" style={{ fontFamily: '"Comic Sans MS", sans-serif' }}>
-                {t.rewardTitle}
+        {/* Loading */}
+        {isProcessing && (
+            <div className="absolute bottom-10 bg-black/60 backdrop-blur-md px-8 py-4 rounded-full border border-white/20 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-10">
+                <Sparkles className="animate-spin text-yellow-400" />
+                <span className="font-mono text-yellow-100">{statusMsg}</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-                {/* รางวัลที่ 2 - Super Teddy */}
-                <div className="bg-pink-50 p-4 rounded-[2rem] border-4 border-pink-200 shadow-md hover:scale-105 transition-transform">
-                    <div className="w-24 h-24 mx-auto bg-pink-200 rounded-full border-4 border-pink-400 flex items-center justify-center mb-4 shadow-inner">
-                        <Gift size={48} className="text-pink-600 fill-pink-300" />
-                    </div>
-                    <h3 className="font-black text-lg text-pink-700">{t.prize2Name}</h3>
-                     <div className="text-pink-500 font-bold text-sm bg-pink-100 px-3 py-1 rounded-full inline-block mt-2">{t.valuePrefix} 240 {t.unit}</div>
-                </div>
-                {/* รางวัลที่ 1 - Giant Robot (ตรงกลาง ใหญ่สุด) */}
-                <div className="bg-blue-50 p-4 rounded-[2rem] border-4 border-blue-300 shadow-lg scale-110 z-10 hover:scale-115 transition-transform relative">
-                    <div className="absolute -top-4 inset-x-0 flex justify-center">
-                        <span className="bg-red-500 text-white text-xs font-black px-4 py-1 rounded-full border-2 border-white shadow-sm animate-bounce">
-                            WOW! BIG PRIZE!
-                        </span>
-                    </div>
-                    <div className="relative w-32 h-32 mx-auto bg-gradient-to-tr from-blue-200 to-cyan-200 rounded-full border-[6px] border-blue-400 flex items-center justify-center mb-4 shadow-inner animate-pulse-slow mt-4">
-                        <Rocket size={64} className="text-blue-700 fill-blue-300 rotate-12" />
-                    </div>
-                    <h3 className="font-black text-2xl text-blue-800" style={{ fontFamily: '"Comic Sans MS", sans-serif' }}>{t.prize1Name}</h3>
-                    <div className="text-red-600 font-black text-xl bg-red-100 px-4 py-1 rounded-full inline-block mt-2 border-2 border-red-200">{t.valuePrefix} 750 {t.unit}</div>
-                </div>
-                {/* รางวัลที่ 3 - Magic Puzzle */}
-                <div className="bg-green-50 p-4 rounded-[2rem] border-4 border-green-200 shadow-md hover:scale-105 transition-transform">
-                    <div className="w-24 h-24 mx-auto bg-green-200 rounded-full border-4 border-green-400 flex items-center justify-center mb-4 shadow-inner">
-                        <Puzzle size={48} className="text-green-600 fill-green-300" />
-                    </div>
-                    <h3 className="font-black text-lg text-green-700">{t.prize3Name}</h3>
-                    <div className="text-green-500 font-bold text-sm bg-green-100 px-3 py-1 rounded-full inline-block mt-2">{t.valuePrefix} 120 {t.unit}</div>
-                </div>
-            </div>
-            <div className="mt-10 pt-6 border-t-4 border-blue-100 text-center relative">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-300 px-6 py-1 text-yellow-800 text-sm font-black rounded-full border-2 border-white shadow-sm">
-                    {t.consolationTitle}
-                </div>
-                <p className="text-base text-blue-600 flex items-center justify-center gap-3 font-bold mt-4 bg-blue-50 p-3 rounded-xl">
-                    {t.consolationItems}
-                </p>
-            </div>
-        </section>
+        )}
 
-        {/* Status Log (จอคอมของเล่น) */}
-        <section className="bg-gray-800 rounded-[1.5rem] p-4 font-mono text-sm text-green-400 border-[6px] border-gray-600 h-36 overflow-hidden relative shadow-inner font-bold">
-            <div className="flex items-center gap-2 mb-2 text-gray-300 border-b-2 border-gray-600 pb-1 font-black bg-gray-700 px-2 rounded-md">
-                <Gamepad2 size={16} /> {t.logTitle}
-            </div>
-            <ul className="space-y-1 opacity-90 tracking-wider">
-                {statusMsg && <li className="text-yellow-300 animate-pulse">🚀 {statusMsg}</li>}
-                <li>[ToyOS] Connecting to Toy Contract: {GAME_ADDRESS.slice(0,6)}...</li>
-                <li>[ToyOS] System Ready to Play! Beep Boop.</li>
-            </ul>
-        </section>
       </main>
 
-      {/* Modal (กล่องเด้งป๊อปอัพน่ารักๆ) */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white border-[8px] border-pink-300 rounded-[3rem] p-8 w-full max-w-sm relative shadow-2xl text-center transform hover:scale-105 transition-transform animate-in zoom-in-95 duration-200">
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-pink-500 p-4 rounded-full border-4 border-white shadow-md">
-                <Star size={40} className="text-white animate-spin-slow fill-yellow-300" />
+      {/* Reward Modal */}
+      {showModal && reward && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+          <div className="bg-white text-gray-900 rounded-[2.5rem] p-8 w-full max-w-sm text-center relative shadow-[0_0_60px_rgba(255,255,255,0.4)] transform scale-100 animate-bounce-slow overflow-visible border-4 border-white/50">
+            
+            {/* Rarity Badge */}
+            <div className="absolute -top-4 right-8 bg-gray-900 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-white/20">
+                {reward.type}
             </div>
-            <h3 className="text-3xl font-black text-pink-600 mb-4 mt-6" style={{ fontFamily: '"Comic Sans MS", sans-serif' }}>
-                {t.modalTitle}
-            </h3>
-            <p className="text-blue-700 mb-6 text-lg font-bold">
-              {t.modalDesc} <br/>
-              <span className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-orange-500 drop-shadow-sm my-4 block animate-pulse" style={{ fontFamily: '"Comic Sans MS", sans-serif' }}>
-                {luckyNumbers[selectedSlot!]}
-              </span>
-              <span className="text-white bg-blue-400 px-4 py-1 rounded-full text-base">
-                {t.modalCost}
-              </span>
-            </p>
-            <div className="flex gap-4">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-4 rounded-full border-4 border-gray-300 text-gray-500 font-black hover:bg-gray-100 transition-colors text-lg" disabled={isProcessing}>
-                {t.btnCancel} 🤮
-              </button>
-              <button onClick={confirmPurchase} disabled={isProcessing} className="flex-1 py-4 rounded-full bg-gradient-to-r from-green-400 to-blue-500 text-white font-black hover:from-green-500 hover:to-blue-600 shadow-lg border-4 border-white transition-all hover:scale-105 disabled:opacity-50 text-lg hover:rotate-2">
-                {isProcessing ? t.processing : t.btnConfirm} 🤩
-              </button>
+
+            {/* Icon */}
+            <div className="mb-6 mt-2 flex justify-center">
+                <div className={`p-6 rounded-full bg-gray-50 border-4 border-gray-100 shadow-inner ${reward.color}`}>
+                    <reward.icon size={80} strokeWidth={1.5} />
+                </div>
             </div>
+
+            {/* Name */}
+            <h2 className={`text-2xl font-black mb-2 ${reward.color} drop-shadow-sm`}>
+                {lang === 'th' ? reward.name.th : reward.name.en}
+            </h2>
+
+            {/* Message/Wish */}
+            <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 mb-8 relative">
+                <div className="absolute -top-3 left-4 text-4xl text-gray-200">“</div>
+                <p className="text-gray-600 text-sm font-medium italic leading-relaxed relative z-10">
+                    {lang === 'th' ? reward.desc.th : reward.desc.en}
+                </p>
+                <div className="absolute -bottom-6 right-4 text-4xl text-gray-200">”</div>
+            </div>
+
+            <button 
+                onClick={() => setShowModal(false)}
+                className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black hover:scale-[1.02] transition-all shadow-lg text-lg flex items-center justify-center gap-2"
+            >
+                <Sparkles size={18} /> {lang === 'th' ? "เก็บใส่กระเป๋า" : "Keep it"}
+            </button>
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-10px) rotate(5deg); }
+        }
+      `}</style>
     </div>
   );
 }
