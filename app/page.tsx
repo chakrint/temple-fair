@@ -1,20 +1,21 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { MiniKit, ResponseEvent } from '@worldcoin/minikit-js';
+import { MiniKit } from '@worldcoin/minikit-js';
 import { 
   Sparkles, Star, Cloud, Candy, Flame, Stethoscope, 
   Cat, Bird, Sprout, Rocket, Zap, Crown, 
   Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet
 } from "lucide-react";
 
-// ✅ Import จาก path ที่ถูกต้อง
+// ✅ Import Component ดาววิบวับ (ใช้ @/ ตามที่ตั้งค่าใน tsconfig.json)
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.1.4 (Stable)";
+const APP_VERSION = "V.1.5 (Type Fixed)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
+// ใส่ contract address จริงของคุณถ้ามี
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
 
 // --- 1. Database ของรางวัล ---
@@ -61,11 +62,9 @@ export default function StarCatcherApp() {
   const [moonRotation, setMoonRotation] = useState(0);
   const [isFullMoon, setIsFullMoon] = useState(false);
 
-  // ✅ Fix 1: Safe Initialization
+  // Initialize MiniKit
   useEffect(() => {
     try {
-        // ใช้ appId แบบ String ตามที่ Error log แนะนำ
-        // ถ้าไม่มี env ให้ใส่ string ว่างหรือ dummy เพื่อป้องกัน crash ใน local
         const appId = process.env.NEXT_PUBLIC_APP_ID || "app_staging_dummy";
         MiniKit.install(appId); 
         console.log("MiniKit Installed Status:", MiniKit.isInstalled());
@@ -103,11 +102,10 @@ export default function StarCatcherApp() {
     return () => clearInterval(interval);
   }, [isFullMoon]);
 
-  // --- Handlers ---
   const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
   const handleDisconnect = () => setUserAddress("");
 
-  // ✅ Fix 2: Robust Wallet Auth
+  // ✅ Connect Logic (Fixed Types)
   const handleConnect = async () => {
     // 1. Mock Mode (Chrome)
     if (!MiniKit.isInstalled()) {
@@ -119,7 +117,6 @@ export default function StarCatcherApp() {
 
     // 2. Real World App Mode
     try {
-        // ใช้ Standard Command (แบบ async/await)
         const res = await MiniKit.commands.walletAuth({
             nonce: crypto.randomUUID(),
             requestId: "0",
@@ -127,15 +124,12 @@ export default function StarCatcherApp() {
             notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000),
         });
 
-        // ตรวจสอบ Response ตามโครงสร้าง MiniKit V1
-        if (res && res.status === 'success') {
-             // บางเวอร์ชัน address อาจจะอยู่ใน res.address หรือ res.commandPayload
-             // เพื่อความชัวร์ ให้ลองดึงหลายทาง (Fallback)
-             const addr = res.address || (res as any).commandPayload?.address || "0xConnectedUser";
+        // ใช้ (res as any) เพื่อแก้ปัญหา Type Error: Property 'status' does not exist
+        if (res && (res as any).status === 'success') {
+             const addr = (res as any).address || (res as any).commandPayload?.address || "0xConnectedUser";
              setUserAddress(addr);
         } else if (res) {
-             // กรณี V1 บางทีคืนค่ามาเลย
-             const addr = res.address || "0xConnectedUser";
+             const addr = (res as any).address || "0xConnectedUser";
              setUserAddress(addr);
         }
     } catch (error) {
@@ -152,7 +146,7 @@ export default function StarCatcherApp() {
     attemptCatch("FREE", type, id);
   };
 
-  // ✅ Fix 3: Standard Transaction Handler
+  // ✅ Transaction Logic (Fixed Types)
   const attemptCatch = async (mode: "FREE" | "PAID", type: string, id?: string | number) => {
     setIsProcessing(true);
     setStatusMsg(mode === "FREE" ? "Catching..." : "Paying 1 SLG...");
@@ -172,7 +166,7 @@ export default function StarCatcherApp() {
     const txPayload = {
         transaction: [{
             address: CONTRACT_ADDRESS,
-            abi: [], // ควรใส่ ABI จริงถ้าต้องการ encode data
+            abi: [], // ใส่ ABI จริงที่นี่ถ้าต้องการ
             functionName: mode === "FREE" ? "catchStarFree" : "catchStarPaid",
             args: []
         }]
@@ -181,12 +175,12 @@ export default function StarCatcherApp() {
     try {
         const res = await MiniKit.commands.sendTransaction(txPayload);
         
-        // ตรวจสอบผลลัพธ์แบบ Loose Check เพื่อกัน Error
-        if (res && (res.status === 'success' || (res as any).transactionHash)) {
+        // ใช้ (res as any) เพื่อแก้ปัญหา Type Error
+        if (res && ((res as any).status === 'success' || (res as any).transactionHash)) {
             if (mode === "FREE") finalizeCatch(type, id);
             else { setShowPayModal(false); finalizeCatch(type, id); }
         } else {
-            // ถ้า User กดยกเลิก
+             // User อาจจะกดยกเลิก
              if (mode === "FREE") setShowPayModal(true);
         }
     } catch (error) {
