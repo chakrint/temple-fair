@@ -9,23 +9,24 @@ import {
   Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet
 } from "lucide-react";
 
-// ✅ Import Component ดาววิบวับ
+// ✅ Import Component ดาววิบวับ (ใช้ @/ แทนการถอย folder เพื่อความชัวร์)
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Version ---
-const APP_VERSION = "V.1.2";
+const APP_VERSION = "V.1.3 (Root Fixed)";
 const MOCK_WALLET = "0xYourMockWalletAddressForTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const TOKEN_ADDRESS = "0x8a26fA986f360EA0B7CDad1E15C5698786b582BC"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
 
-// --- 1. ข้อมูลของรางวัล (ใส่ชื่อไฟล์รูปภาพจริงจาก public) ---
+// --- 1. ข้อมูลของรางวัล (Mapped ตามชื่อไฟล์จริงใน public) ---
+// หมายเหตุ: ชื่อไฟล์ต้องตรงเป๊ะๆ ทั้งตัวเล็กตัวใหญ่
 const REWARDS_DB = [
   { 
     id: 1, 
     type: 'common', 
-    img: "/cloudpillow.png", // ✅ ใช้รูปจริง
-    icon: Cloud, // สำรองไว้เผื่อรูปไม่โหลด
+    img: "/cloudpillow.png", 
+    icon: Cloud, 
     color: 'text-blue-300', 
     name: { th: "หมอนเมฆนุ่มนิ่ม", en: "Cloud Pillow" }, 
     desc: { th: "ขอให้คืนนี้หลับฝันดี ทิ้งความกังวลไว้ข้างหลัง", en: "Sweet dreams tonight. Leave your worries behind." } 
@@ -51,7 +52,7 @@ const REWARDS_DB = [
   { 
     id: 4, 
     type: 'common', 
-    img: "/MagicPlaster.png", 
+    img: "/MagicPlaster.png", // ตัว M ตัว P ตัวใหญ่ตามชื่อไฟล์
     icon: Stethoscope,
     color: 'text-red-300', 
     name: { th: "พลาสเตอร์วิเศษ", en: "Magic Plaster" }, 
@@ -87,7 +88,7 @@ const REWARDS_DB = [
   { 
     id: 8, 
     type: 'legendary', 
-    img: "/Spaceship.png", 
+    img: "/Spaceship.png", // S ตัวใหญ่
     icon: Rocket,
     color: 'text-purple-500', 
     name: { th: "ยานอวกาศ DIY", en: "DIY Spaceship" }, 
@@ -96,7 +97,7 @@ const REWARDS_DB = [
   { 
     id: 9, 
     type: 'legendary', 
-    img: "/BabyGoldDragon.png", 
+    img: "/BabyGoldDragon.png", // B G D ตัวใหญ่
     icon: Zap,
     color: 'text-yellow-500', 
     name: { th: "มังกรน้อยเฝ้าทรัพย์", en: "Baby Gold Dragon" }, 
@@ -105,7 +106,7 @@ const REWARDS_DB = [
   { 
     id: 10, 
     type: 'legendary', 
-    img: "/StardustCrown.png", 
+    img: "/StardustCrown.png", // S C ตัวใหญ่
     icon: Crown,
     color: 'text-yellow-400', 
     name: { th: "มงกุฎดวงดาว", en: "Stardust Crown" }, 
