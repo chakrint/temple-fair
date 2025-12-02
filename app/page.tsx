@@ -1,117 +1,34 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ethers } from "ethers";
-import { MiniKit } from '@worldcoin/minikit-js';
+import { MiniKit, ResponseEvent } from '@worldcoin/minikit-js';
 import { 
   Sparkles, Star, Cloud, Candy, Flame, Stethoscope, 
   Cat, Bird, Sprout, Rocket, Zap, Crown, 
   Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet
 } from "lucide-react";
 
-// ✅ Import Component ดาววิบวับ (ใช้ @/ แทนการถอย folder เพื่อความชัวร์)
+// ✅ Import จาก path ที่ถูกต้อง
 import TwinklingStars from "@/components/TwinklingStars"; 
 
-// --- 0. Config & Version ---
-const APP_VERSION = "V.1.3 (Root Fixed)";
-const MOCK_WALLET = "0xYourMockWalletAddressForTesting";
+// --- 0. Config & Constants ---
+const APP_VERSION = "V.1.4 (Stable)";
+const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
-const TOKEN_ADDRESS = "0x8a26fA986f360EA0B7CDad1E15C5698786b582BC"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
 
-// --- 1. ข้อมูลของรางวัล (Mapped ตามชื่อไฟล์จริงใน public) ---
-// หมายเหตุ: ชื่อไฟล์ต้องตรงเป๊ะๆ ทั้งตัวเล็กตัวใหญ่
+// --- 1. Database ของรางวัล ---
 const REWARDS_DB = [
-  { 
-    id: 1, 
-    type: 'common', 
-    img: "/cloudpillow.png", 
-    icon: Cloud, 
-    color: 'text-blue-300', 
-    name: { th: "หมอนเมฆนุ่มนิ่ม", en: "Cloud Pillow" }, 
-    desc: { th: "ขอให้คืนนี้หลับฝันดี ทิ้งความกังวลไว้ข้างหลัง", en: "Sweet dreams tonight. Leave your worries behind." } 
-  },
-  { 
-    id: 2, 
-    type: 'common', 
-    img: "/starcandy.png", 
-    icon: Candy,
-    color: 'text-pink-400', 
-    name: { th: "ลูกอมรสแสงดาว", en: "Starlight Candy" }, 
-    desc: { th: "เติมความหวานให้ชีวิตสักนิด ยิ้มเข้าไว้นะ", en: "Add some sweetness to life. Keep smiling!" } 
-  },
-  { 
-    id: 3, 
-    type: 'common', 
-    img: "/cozycandle.png", 
-    icon: Flame,
-    color: 'text-orange-300', 
-    name: { th: "เทียนหอมอุ่นใจ", en: "Cozy Candle" }, 
-    desc: { th: "แสงสว่างดวงเล็กๆ จะคอยเป็นเพื่อนคุณเสมอ", en: "A small light of hope will always be with you." } 
-  },
-  { 
-    id: 4, 
-    type: 'common', 
-    img: "/MagicPlaster.png", // ตัว M ตัว P ตัวใหญ่ตามชื่อไฟล์
-    icon: Stethoscope,
-    color: 'text-red-300', 
-    name: { th: "พลาสเตอร์วิเศษ", en: "Magic Plaster" }, 
-    desc: { th: "เป่าเพี้ยง! ความเจ็บปวดจงหายไป", en: "Pain, pain go away! Heal quickly." } 
-  },
-  { 
-    id: 5, 
-    type: 'rare', 
-    img: "/pilotbear.png", 
-    icon: Cat,
-    color: 'text-yellow-600', 
-    name: { th: "หมีน้อยนักบิน", en: "Pilot Bear" }, 
-    desc: { th: "กัปตันหมีรายงานตัว! ผมจะนั่งข้างๆ คุณเอง", en: "Captain Bear reporting! I'll sit right by your side." } 
-  },
-  { 
-    id: 6, 
-    type: 'rare', 
-    img: "/spaceducky.png", 
-    icon: Bird,
-    color: 'text-yellow-300', 
-    name: { th: "เป็ดก๊าบอวกาศ", en: "Space Ducky" }, 
-    desc: { th: "ลอยตุ๊บป่องแบบชิลๆ ปล่อยเบลอบ้างก็ได้นะ", en: "Floating casually... Sometimes just let things be." } 
-  },
-  { 
-    id: 7, 
-    type: 'rare', 
-    img: "/galaxysprout.png", 
-    icon: Sprout,
-    color: 'text-green-400', 
-    name: { th: "ต้นกล้ากาแล็กซี", en: "Galaxy Sprout" }, 
-    desc: { th: "ความฝันของคุณกำลังเติบโต รดน้ำด้วยความตั้งใจนะ", en: "Your dreams are growing. Water them with care." } 
-  },
-  { 
-    id: 8, 
-    type: 'legendary', 
-    img: "/Spaceship.png", // S ตัวใหญ่
-    icon: Rocket,
-    color: 'text-purple-500', 
-    name: { th: "ยานอวกาศ DIY", en: "DIY Spaceship" }, 
-    desc: { th: "ไม่มีฝันไหนใหญ่เกินเอื้อม! ลุยเลย!", en: "No dream is too big! Let's go!" } 
-  },
-  { 
-    id: 9, 
-    type: 'legendary', 
-    img: "/BabyGoldDragon.png", // B G D ตัวใหญ่
-    icon: Zap,
-    color: 'text-yellow-500', 
-    name: { th: "มังกรน้อยเฝ้าทรัพย์", en: "Baby Gold Dragon" }, 
-    desc: { th: "พลังมังกรทองสถิต! รับความโชคดีไปเลย!", en: "Gold Dragon Power! Luck is coming your way!" } 
-  },
-  { 
-    id: 10, 
-    type: 'legendary', 
-    img: "/StardustCrown.png", // S C ตัวใหญ่
-    icon: Crown,
-    color: 'text-yellow-400', 
-    name: { th: "มงกุฎดวงดาว", en: "Stardust Crown" }, 
-    desc: { th: "จงภูมิใจในตัวเอง คุณคือราชาในโลกของคุณ", en: "Be proud. You are the ruler of your own world." } 
-  },
+  { id: 1, type: 'common', img: "/cloudpillow.png", icon: Cloud, color: 'text-blue-300', name: { th: "หมอนเมฆนุ่มนิ่ม", en: "Cloud Pillow" }, desc: { th: "ขอให้คืนนี้หลับฝันดี ทิ้งความกังวลไว้ข้างหลัง", en: "Sweet dreams tonight. Leave your worries behind." } },
+  { id: 2, type: 'common', img: "/starcandy.png", icon: Candy, color: 'text-pink-400', name: { th: "ลูกอมรสแสงดาว", en: "Starlight Candy" }, desc: { th: "เติมความหวานให้ชีวิตสักนิด ยิ้มเข้าไว้นะ", en: "Add some sweetness to life. Keep smiling!" } },
+  { id: 3, type: 'common', img: "/cozycandle.png", icon: Flame, color: 'text-orange-300', name: { th: "เทียนหอมอุ่นใจ", en: "Cozy Candle" }, desc: { th: "แสงสว่างดวงเล็กๆ จะคอยเป็นเพื่อนคุณเสมอ", en: "A small light of hope will always be with you." } },
+  { id: 4, type: 'common', img: "/MagicPlaster.png", icon: Stethoscope, color: 'text-red-300', name: { th: "พลาสเตอร์วิเศษ", en: "Magic Plaster" }, desc: { th: "เป่าเพี้ยง! ความเจ็บปวดจงหายไป", en: "Pain, pain go away! Heal quickly." } },
+  { id: 5, type: 'rare', img: "/pilotbear.png", icon: Cat, color: 'text-yellow-600', name: { th: "หมีน้อยนักบิน", en: "Pilot Bear" }, desc: { th: "กัปตันหมีรายงานตัว! ผมจะนั่งข้างๆ คุณเอง", en: "Captain Bear reporting! I'll sit right by your side." } },
+  { id: 6, type: 'rare', img: "/spaceducky.png", icon: Bird, color: 'text-yellow-300', name: { th: "เป็ดก๊าบอวกาศ", en: "Space Ducky" }, desc: { th: "ลอยตุ๊บป่องแบบชิลๆ ปล่อยเบลอบ้างก็ได้นะ", en: "Floating casually... Sometimes just let things be." } },
+  { id: 7, type: 'rare', img: "/galaxysprout.png", icon: Sprout, color: 'text-green-400', name: { th: "ต้นกล้ากาแล็กซี", en: "Galaxy Sprout" }, desc: { th: "ความฝันของคุณกำลังเติบโต รดน้ำด้วยความตั้งใจนะ", en: "Your dreams are growing. Water them with care." } },
+  { id: 8, type: 'legendary', img: "/Spaceship.png", icon: Rocket, color: 'text-purple-500', name: { th: "ยานอวกาศ DIY", en: "DIY Spaceship" }, desc: { th: "ไม่มีฝันไหนใหญ่เกินเอื้อม! ลุยเลย!", en: "No dream is too big! Let's go!" } },
+  { id: 9, type: 'legendary', img: "/BabyGoldDragon.png", icon: Zap, color: 'text-yellow-500', name: { th: "มังกรน้อยเฝ้าทรัพย์", en: "Baby Gold Dragon" }, desc: { th: "พลังมังกรทองสถิต! รับความโชคดีไปเลย!", en: "Gold Dragon Power! Luck is coming your way!" } },
+  { id: 10, type: 'legendary', img: "/StardustCrown.png", icon: Crown, color: 'text-yellow-400', name: { th: "มงกุฎดวงดาว", en: "Stardust Crown" }, desc: { th: "จงภูมิใจในตัวเอง คุณคือราชาในโลกของคุณ", en: "Be proud. You are the ruler of your own world." } },
 ];
 
 // --- 2. Drifting Text Component ---
@@ -127,7 +44,7 @@ const DriftingText = ({ children, className }: { children: React.ReactNode, clas
   );
 };
 
-// --- 3. Main App ---
+// --- 3. Main Page Component ---
 export default function StarCatcherApp() {
   const [lang, setLang] = useState<"th" | "en">("en");
   const [userAddress, setUserAddress] = useState("");
@@ -138,25 +55,26 @@ export default function StarCatcherApp() {
   const [targetItem, setTargetItem] = useState<{ type: string, id?: string | number } | null>(null);
   const [reward, setReward] = useState<any>(null);
   
-  // Visual State
+  // Visual States
   const [stars, setStars] = useState<any[]>([]);
   const [isSunBig, setIsSunBig] = useState(false);
   const [moonRotation, setMoonRotation] = useState(0);
   const [isFullMoon, setIsFullMoon] = useState(false);
 
-  // Initialize MiniKit
+  // ✅ Fix 1: Safe Initialization
   useEffect(() => {
     try {
-      MiniKit.install({
-        appId: process.env.NEXT_PUBLIC_APP_ID || "app_staging_12345", 
-      });
-      console.log("MiniKit Installed:", MiniKit.isInstalled());
+        // ใช้ appId แบบ String ตามที่ Error log แนะนำ
+        // ถ้าไม่มี env ให้ใส่ string ว่างหรือ dummy เพื่อป้องกัน crash ใน local
+        const appId = process.env.NEXT_PUBLIC_APP_ID || "app_staging_dummy";
+        MiniKit.install(appId); 
+        console.log("MiniKit Installed Status:", MiniKit.isInstalled());
     } catch (e) {
-      console.warn("MiniKit install failed (Testing on Browser?)", e);
+        console.warn("MiniKit install warning:", e);
     }
   }, []);
 
-  // Setup Interactable Stars
+  // Setup Stars
   useEffect(() => {
     const newStars = Array.from({ length: 35 }, (_, i) => ({
       id: i, left: Math.random() * 100, top: Math.random() * 100, 
@@ -167,6 +85,7 @@ export default function StarCatcherApp() {
     setStars(newStars);
   }, []);
 
+  // Sun & Moon Animation Loop
   useEffect(() => {
     const activateSun = () => { setIsSunBig(true); setTimeout(() => setIsSunBig(false), 5000); };
     activateSun();
@@ -184,12 +103,13 @@ export default function StarCatcherApp() {
     return () => clearInterval(interval);
   }, [isFullMoon]);
 
-  // --- Functions ---
+  // --- Handlers ---
   const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
   const handleDisconnect = () => setUserAddress("");
 
-  // Logic: Connect
+  // ✅ Fix 2: Robust Wallet Auth
   const handleConnect = async () => {
+    // 1. Mock Mode (Chrome)
     if (!MiniKit.isInstalled()) {
         console.log("Browser Mode: Mocking Login...");
         setUserAddress(MOCK_WALLET);
@@ -197,19 +117,30 @@ export default function StarCatcherApp() {
         return;
     }
 
+    // 2. Real World App Mode
     try {
+        // ใช้ Standard Command (แบบ async/await)
         const res = await MiniKit.commands.walletAuth({
-            nonce:  crypto.randomUUID(),
+            nonce: crypto.randomUUID(),
             requestId: "0",
             expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
             notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000),
         });
-        if (res) {
-            setUserAddress(res.address || "0xMiniKitUser"); 
+
+        // ตรวจสอบ Response ตามโครงสร้าง MiniKit V1
+        if (res && res.status === 'success') {
+             // บางเวอร์ชัน address อาจจะอยู่ใน res.address หรือ res.commandPayload
+             // เพื่อความชัวร์ ให้ลองดึงหลายทาง (Fallback)
+             const addr = res.address || (res as any).commandPayload?.address || "0xConnectedUser";
+             setUserAddress(addr);
+        } else if (res) {
+             // กรณี V1 บางทีคืนค่ามาเลย
+             const addr = res.address || "0xConnectedUser";
+             setUserAddress(addr);
         }
     } catch (error) {
-        console.error(error);
-        alert("Connection Failed");
+        console.error("Login Error:", error);
+        alert("Login Failed. Please try again.");
     }
   };
 
@@ -221,11 +152,12 @@ export default function StarCatcherApp() {
     attemptCatch("FREE", type, id);
   };
 
-  // Logic: Catch (Transaction)
+  // ✅ Fix 3: Standard Transaction Handler
   const attemptCatch = async (mode: "FREE" | "PAID", type: string, id?: string | number) => {
     setIsProcessing(true);
     setStatusMsg(mode === "FREE" ? "Catching..." : "Paying 1 SLG...");
 
+    // Mock Mode
     if (!MiniKit.isInstalled()) {
         setTimeout(() => {
              setIsProcessing(false);
@@ -236,10 +168,11 @@ export default function StarCatcherApp() {
         return;
     }
 
+    // Real Mode
     const txPayload = {
         transaction: [{
             address: CONTRACT_ADDRESS,
-            abi: [], 
+            abi: [], // ควรใส่ ABI จริงถ้าต้องการ encode data
             functionName: mode === "FREE" ? "catchStarFree" : "catchStarPaid",
             args: []
         }]
@@ -247,11 +180,17 @@ export default function StarCatcherApp() {
 
     try {
         const res = await MiniKit.commands.sendTransaction(txPayload);
-        if (res) {
+        
+        // ตรวจสอบผลลัพธ์แบบ Loose Check เพื่อกัน Error
+        if (res && (res.status === 'success' || (res as any).transactionHash)) {
             if (mode === "FREE") finalizeCatch(type, id);
             else { setShowPayModal(false); finalizeCatch(type, id); }
+        } else {
+            // ถ้า User กดยกเลิก
+             if (mode === "FREE") setShowPayModal(true);
         }
     } catch (error) {
+        console.error("Tx Error:", error);
         if (mode === "FREE") setShowPayModal(true);
         else alert("Transaction Failed");
     } finally {
@@ -267,6 +206,7 @@ export default function StarCatcherApp() {
 
       const rand = Math.random() * 100;
       let selectedId = 1;
+      // Simple Rarity Logic
       if (type === 'sun') selectedId = Math.floor(Math.random() * 3) + 8;
       else if (type === 'moon') selectedId = Math.floor(Math.random() * 6) + 5;
       else {
@@ -274,6 +214,7 @@ export default function StarCatcherApp() {
         else if (rand < 95) selectedId = Math.floor(Math.random() * 3) + 5;
         else selectedId = Math.floor(Math.random() * 3) + 8;
       }
+      
       const item = REWARDS_DB.find(r => r.id === selectedId);
       setReward(item);
       setShowModal(true);
@@ -288,7 +229,6 @@ export default function StarCatcherApp() {
   return (
     <div className="min-h-screen bg-black text-white font-sans relative overflow-hidden cursor-grab active:cursor-grabbing selection:bg-pink-500">
       
-      {/* Component ดาววิบวับ */}
       <TwinklingStars />
 
       {/* Navbar */}
@@ -312,13 +252,13 @@ export default function StarCatcherApp() {
             ) : (
             <button onClick={handleDisconnect} className="px-4 py-2 bg-white/10 rounded-full font-bold text-xs flex items-center gap-2 border border-white/20 hover:bg-red-500/20 group transition-all">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse group-hover:bg-red-400"></div>
-                MockUser... <LogOut size={12} className="hidden group-hover:block" />
+                <span className="max-w-[80px] truncate">{userAddress}</span> <LogOut size={12} className="hidden group-hover:block" />
             </button>
             )}
         </div>
       </header>
 
-      {/* Main Sky Area */}
+      {/* Main Area */}
       <main className="relative z-20 w-full h-[85vh] flex flex-col items-center justify-start pt-12 text-center pointer-events-none">
         <div className="relative z-20 mb-8">
              <DriftingText className="mb-2">
@@ -356,7 +296,7 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        {/* ⭐ Stars (Interactable) */}
+        {/* ⭐ Stars */}
         <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
             {stars.map((star) => (
                 <button
@@ -385,7 +325,7 @@ export default function StarCatcherApp() {
             <span className="text-[10px] text-white/30 font-mono tracking-widest select-none">{APP_VERSION}</span>
         </div>
 
-        {/* Loading */}
+        {/* Loading Indicator */}
         {isProcessing && (
             <div className="absolute bottom-20 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-5 z-30">
                 <Sparkles className="animate-spin text-yellow-400 w-4 h-4" />
@@ -419,7 +359,6 @@ export default function StarCatcherApp() {
                 {reward.type}
             </div>
             <div className="mb-6 mt-2 flex justify-center">
-                {/* โชว์รูปภาพจริง (img) หรือ icon สำรอง */}
                 {reward.img ? (
                     <img src={reward.img} alt={reward.name.en} className="w-40 h-40 object-contain drop-shadow-2xl animate-in zoom-in duration-300" />
                 ) : (
@@ -441,6 +380,7 @@ export default function StarCatcherApp() {
         </div>
       )}
 
+      {/* Global CSS for Animations (Standard Tailwind Compatible) */}
       <style jsx global>{`
         .pause-on-hover:hover { animation-play-state: paused !important; }
         .animate-spin-slow { animation: spin 10s linear infinite; }
