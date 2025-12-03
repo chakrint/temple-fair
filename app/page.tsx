@@ -11,7 +11,7 @@ import {
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.2.7 (Moon Update)";
+const APP_VERSION = "V.2.8 (Moon Click Fixed)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
@@ -110,7 +110,7 @@ export default function StarCatcherApp() {
   const [moonRotation, setMoonRotation] = useState(0);
   const [isFullMoon, setIsFullMoon] = useState(false);
   
-  // ✅ Moon States (Updated V2.7)
+  // ✅ Moon States
   const [moonPos, setMoonPos] = useState({ top: 15, right: 10 });
   const [targetMoonRotation, setTargetMoonRotation] = useState(360);
 
@@ -124,8 +124,8 @@ export default function StarCatcherApp() {
   // Stars Logic
   useEffect(() => {
     const newStars = [];
-    const RUNNING_STARS_MIN = 3;
-    const RUNNING_STARS_MAX = 8;
+    const RUNNING_STARS_MIN = 5;
+    const RUNNING_STARS_MAX = 15;
     const count = Math.floor(Math.random() * (RUNNING_STARS_MAX - RUNNING_STARS_MIN + 1)) + RUNNING_STARS_MIN;
     const moveTypes = ['flyRight', 'flyUp', 'curvePath'];
     for (let i = 0; i < count; i++) {
@@ -153,23 +153,21 @@ export default function StarCatcherApp() {
     return () => { clearTimeout(initialHide); clearInterval(interval); };
   }, []);
 
-  // ✅ Moon Movement: ย้ายตำแหน่งสุ่มทุก 10 วินาที
+  // ✅ Moon Movement
   useEffect(() => {
     const moveMoon = () => {
         setMoonPos({
-            top: Math.random() * 60 + 10, // 10% - 70% (บน-ล่าง)
-            right: Math.random() * 80 + 10 // 10% - 90% (ซ้าย-ขวา)
+            top: Math.random() * 60 + 10, // 10% - 70%
+            right: Math.random() * 80 + 10 // 10% - 90%
         });
     };
     const interval = setInterval(moveMoon, 10000); 
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Moon Rotation: หมุน 1-10 รอบก่อนเปิด
+  // ✅ Moon Rotation
   useEffect(() => {
-    // สุ่มเป้าหมายใหม่เมื่อรีเซ็ต
     if (!isFullMoon && moonRotation === 0) {
-        // สุ่ม 1-10 รอบ (360 * n)
         setTargetMoonRotation(360 * (Math.floor(Math.random() * 10) + 1));
     }
   }, [isFullMoon, moonRotation]);
@@ -188,7 +186,7 @@ export default function StarCatcherApp() {
             return targetMoonRotation;
         }
         
-        return prev + 3; // ความเร็วหมุน (3 deg / 50ms)
+        return prev + 3; 
       });
     }, 50);
     return () => clearInterval(interval);
@@ -197,7 +195,7 @@ export default function StarCatcherApp() {
   const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
   const handleDisconnect = () => setUserAddress("");
 
-  // Canvas Generator & Share (Same as before)
+  // Canvas Generator & Share
   const generateCardImage = async (rewardItem: any): Promise<File | null> => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -353,9 +351,9 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        {/* 🌙 Moon (Updated V2.7: Random Pos + Rotation) */}
+        {/* 🌙 Moon (Fixed: Added pointer-events-auto) */}
         <div 
-            className="absolute z-40 transition-all duration-[8000ms] ease-in-out"
+            className="absolute z-40 transition-all duration-[8000ms] ease-in-out pointer-events-auto" // ✅ แก้ไขตรงนี้: เพิ่ม pointer-events-auto ให้ div แม่
             style={{ 
                 top: `${moonPos.top}%`, 
                 right: `${moonPos.right}%` 
