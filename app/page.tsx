@@ -5,7 +5,7 @@ import { MiniKit } from '@worldcoin/minikit-js';
 import { 
   Sparkles, Star, Cloud, Candy, Flame, Stethoscope, 
   Cat, Bird, Sprout, Rocket, Zap, Crown, 
-  Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet, Share2, Download
+  Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet, Share2, Download, AlertTriangle
 } from "lucide-react";
 
 import TwinklingStars from "@/components/TwinklingStars"; 
@@ -15,13 +15,13 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.3.1 (Test Mode Support)";
+const APP_VERSION = "V.3.2 (Visual Mode Indicator)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
-const APP_URL = "[https://temple-fair.vercel.app](https://temple-fair.vercel.app)"; 
+const APP_URL = "https://temple-fair.vercel.app"; 
 
-// ✅ ตัวแปรเช็ค Test Mode (อ่านจาก Environment Variable)
+// ✅ ตัวแปรเช็ค Test Mode
 const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
 
 // --- 1. Database ของรางวัล ---
@@ -201,7 +201,7 @@ export default function StarCatcherApp() {
   const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
   const handleDisconnect = () => setUserAddress("");
 
-  // ✅ Firebase Quota Check Function (Updated V3.1)
+  // ✅ Firebase Quota Check Function
   const checkAndIncrementQuota = async (address: string): Promise<boolean> => {
     // 1. ถ้าเป็น Test Mode หรือ Mock User -> ให้ผ่านตลอด (Unlimited)
     if (IS_TEST_MODE || !address || address === MOCK_WALLET) {
@@ -320,20 +320,18 @@ export default function StarCatcherApp() {
     setIsProcessing(true);
     setStatusMsg(mode === "FREE" ? "Checking Quota..." : "Paying 1 SLG...");
 
-    // ✅ 2. แทรกการเช็คโควตาตรงนี้
     if (mode === "FREE") {
         const hasQuota = await checkAndIncrementQuota(userAddress);
         if (!hasQuota) {
             setIsProcessing(false);
-            setShowPayModal(true); // โควตาเต็ม -> เด้งถามให้จ่ายเงิน
-            return; // หยุดการทำงาน ไม่ให้จับฟรี
+            setShowPayModal(true); 
+            return; 
         }
         setStatusMsg("Catching...");
     }
 
     if (!MiniKit.isInstalled()) { setTimeout(() => { setIsProcessing(false); setStatusMsg(""); if (mode === "PAID") setShowPayModal(false); finalizeCatch(type, id); }, 2000); return; }
     
-    // ... (ส่วน Transaction จ่ายเงิน เหมือนเดิม) ...
     const txPayload = { transaction: [{ address: CONTRACT_ADDRESS, abi: [], functionName: mode === "FREE" ? "catchStarFree" : "catchStarPaid", args: [] }] };
     try {
         const res = await MiniKit.commands.sendTransaction(txPayload);
@@ -360,6 +358,15 @@ export default function StarCatcherApp() {
   return (
     <div className="min-h-screen bg-black text-white font-sans relative overflow-hidden cursor-grab active:cursor-grabbing selection:bg-pink-500">
       <TwinklingStars />
+      
+      {/* ✅ TEST MODE INDICATOR BANNER */}
+      {IS_TEST_MODE && (
+        <div className="fixed top-0 left-0 w-full bg-yellow-500/90 text-black font-bold text-xs text-center py-1 z-50 shadow-md flex items-center justify-center gap-2">
+            <AlertTriangle size={12} />
+            <span>TEST MODE (Unlimited Quota)</span>
+        </div>
+      )}
+
       <header className="relative z-30 p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white/10 rounded-full backdrop-blur-md border border-white/20 shadow-sm"><Star className="text-yellow-300 fill-yellow-300" size={20} /></div>
