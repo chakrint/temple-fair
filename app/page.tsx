@@ -15,14 +15,28 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.3.3 (Smooth Play)";
+const APP_VERSION = "V.3.5 (Contract Update)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
-const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
+
+// ✅ อัปเดต Contract Address เป็นของจริงที่คุณให้มา
+const CONTRACT_ADDRESS = "0xf8e81D47203A594245E36C48e151709F0C19fBe8"; 
+
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
 const APP_URL = "https://temple-fair.vercel.app"; 
 
 // ✅ ตัวแปรเช็ค Test Mode
 const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
+
+// ✅ 1.1 เพิ่ม ABI (คู่มือ) สำหรับฟังก์ชันจ่ายเงิน
+const CATCH_STAR_PAID_ABI = [
+  {
+    "inputs": [],
+    "name": "catchStarPaid",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  }
+];
 
 // --- 1. Database ของรางวัล ---
 const REWARDS_DB = [
@@ -203,7 +217,6 @@ export default function StarCatcherApp() {
 
   // ✅ Firebase Quota Check Function
   const checkAndIncrementQuota = async (address: string): Promise<boolean> => {
-    // 1. ถ้าเป็น Test Mode หรือ Mock User -> ให้ผ่านตลอด (Unlimited)
     if (IS_TEST_MODE || !address || address === MOCK_WALLET) {
         console.log("🚀 Test Mode/Mock: Unlimited Quota!");
         return true; 
@@ -316,32 +329,30 @@ export default function StarCatcherApp() {
     attemptCatch("FREE", type, id);
   };
 
-  // ✅ V3.3 Updated attemptCatch (Skip Transaction for FREE mode)
+  // ✅ V3.4 Updated attemptCatch (Included ABI for Paid Tx)
   const attemptCatch = async (mode: "FREE" | "PAID", type: string, id?: string | number) => {
     setIsProcessing(true);
     setStatusMsg(mode === "FREE" ? "Checking Quota..." : "Paying 1 SLG...");
 
-    // 1. Check Quota (สำหรับเล่นฟรี)
+    // 1. Check Quota (Free Mode)
     if (mode === "FREE") {
         const hasQuota = await checkAndIncrementQuota(userAddress);
         if (!hasQuota) {
             setIsProcessing(false);
-            setShowPayModal(true); // โควตาหมด -> จ่ายเงิน
+            setShowPayModal(true); // Quota full -> Pay
             return;
         }
-        
-        // 🟢 FIX: ถ้าเล่นฟรี (และโควตาผ่าน) ให้ข้าม Transaction ไปเลย!
-        // แค่หน่วงเวลาเล่นอนิเมชั่นนิดหน่อยพอ
+        // ถ้าโควตาผ่าน ข้าม Transaction ไปเลย (Gasless for user)
         setStatusMsg("Catching...");
         setTimeout(() => {
             setIsProcessing(false);
             setStatusMsg("");
             finalizeCatch(type, id);
-        }, 800); // ดีเลย์ 0.8 วิ ให้ดูเหมือนโหลด
-        return; // จบการทำงานตรงนี้ ไม่ต้องไปเรียก MiniKit sendTransaction
+        }, 800);
+        return; 
     }
 
-    // 2. Mock Mode (เผื่อเทสบนคอมในโหมดจ่ายเงิน)
+    // 2. Mock Mode
     if (!MiniKit.isInstalled()) { 
         setTimeout(() => { 
             setIsProcessing(false); 
@@ -352,16 +363,23 @@ export default function StarCatcherApp() {
         return; 
     }
     
-    // 3. Paid Mode Transaction (ทำงานเฉพาะตอนกดจ่ายเงิน 1 SLG)
-    const txPayload = { transaction: [{ address: CONTRACT_ADDRESS, abi: [], functionName: "catchStarPaid", args: [] }] };
+    // 3. Paid Mode Transaction (With ABI!)
+    const txPayload = { 
+        transaction: [{ 
+            address: CONTRACT_ADDRESS, 
+            abi: CATCH_STAR_PAID_ABI, // ✅ ใส่ ABI แล้ว (แก้ Error)
+            functionName: "catchStarPaid", 
+            args: [] 
+        }] 
+    };
+
     try {
         const res = await MiniKit.commands.sendTransaction(txPayload);
         if (res && ((res as any).status === 'success' || (res as any).transactionHash)) {
             setShowPayModal(false); 
             finalizeCatch(type, id);
         } else { 
-            // จ่ายเงินไม่สำเร็จ หรือกดยกเลิก
-            // ไม่ต้องทำอะไร (หรือจะแจ้งเตือนก็ได้)
+            // Transaction cancelled or failed
         } 
     } catch (error) { 
         alert("Transaction Failed"); 
