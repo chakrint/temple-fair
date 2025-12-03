@@ -11,7 +11,7 @@ import {
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.2.3 (Sun & Moon Logic)";
+const APP_VERSION = "V.2.4 (Star Logic Fixed)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
@@ -70,17 +70,40 @@ export default function StarCatcherApp() {
     }
   }, []);
 
-  // ✅ Stars Logic: เหลือ 3 ดวง และลดขนาด
+  // ✅ Stars Logic (Updated V2.4)
   useEffect(() => {
-    const newStars = Array.from({ length: 3 }, (_, i) => ({ // ลดเหลือ 3 ดวง
-      id: i, 
-      left: Math.random() * 90 + 5, // กันไม่ให้ชิดขอบเกินไป
-      top: Math.random() * 80 + 10, 
-      size: Math.random() * 0.5 + 0.5, // ลดขนาดลง (0.5 - 1.0 เท่า)
-      animType: ['float', 'flyRight', 'flyUp', 'curvePath'][Math.floor(Math.random() * 4)],
-      duration: Math.random() * 20 + 10, // ช้าลงหน่อยให้ดู Relax
-      delay: Math.random() * 10
-    }));
+    const newStars = [];
+    let idCounter = 0;
+
+    // 1. Floating Stars (ขยับน้อยๆ) - Fixed 3 ดวง
+    for (let i = 0; i < 3; i++) {
+        newStars.push({
+            id: idCounter++,
+            left: Math.random() * 90 + 5,
+            top: Math.random() * 80 + 10,
+            size: Math.random() * 0.5 + 0.5,
+            animType: 'float', // บังคับเป็น float
+            duration: Math.random() * 15 + 10,
+            delay: Math.random() * 5
+        });
+    }
+
+    // 2. Running Stars (ดาววิ่ง) - Random 3-8 ดวง
+    const runningCount = Math.floor(Math.random() * 6) + 3; // 3 ถึง 8
+    const moveTypes = ['flyRight', 'flyUp', 'curvePath'];
+
+    for (let i = 0; i < runningCount; i++) {
+        newStars.push({
+            id: idCounter++,
+            left: Math.random() * 90 + 5,
+            top: Math.random() * 80 + 10,
+            size: Math.random() * 0.5 + 0.5,
+            animType: moveTypes[Math.floor(Math.random() * moveTypes.length)],
+            duration: Math.random() * 20 + 10,
+            delay: Math.random() * 10
+        });
+    }
+
     setStars(newStars);
   }, []);
 
@@ -94,7 +117,7 @@ export default function StarCatcherApp() {
     const interval = setInterval(() => {
       setIsSunBig(true);
       setTimeout(() => setIsSunBig(false), 3000); // โชว์ 3 วิ
-    }, 60 * 60 * 1000); // 1 ชั่วโมง (3,600,000 ms)
+    }, 60 * 60 * 1000); // 1 ชั่วโมง
 
     return () => {
         clearTimeout(initialHide);
@@ -183,7 +206,7 @@ export default function StarCatcherApp() {
             ctx.font = '40px sans-serif';
             ctx.fillStyle = '#e2e8f0';
             
-            // ✅ ปรับขนาด QR Code ให้เล็กลง
+            // ✅ ปรับขนาด QR Code ให้เล็กลง (150px)
             const qrSize = 150; 
             const qrPadding = 40;
 
@@ -193,8 +216,8 @@ export default function StarCatcherApp() {
             // ✅ ปรับ maxWidth ให้ข้อความไม่ทับ QR Code
             const maxWidth = size - (qrSize + qrPadding * 2) - 100; 
 
-            ctx.textAlign = 'left'; // จัดชิดซ้ายเพื่อให้ตัดคำสวยงาม
-            const textX = 100; // เริ่มต้นข้อความจากซ้าย
+            ctx.textAlign = 'left'; 
+            const textX = 100; 
 
             for(let n = 0; n < words.length; n++) {
                 const testLine = line + words[n] + ' ';
@@ -212,7 +235,7 @@ export default function StarCatcherApp() {
             // 6. ✅ Draw QR Code (Right Bottom)
             ctx.drawImage(qrImg, size - qrSize - qrPadding, size - qrSize - qrPadding, qrSize, qrSize);
             
-            // 7. ✅ App Logo above QR Code (แทนที่ Scan to Play และ Star Catcher ด้านซ้าย)
+            // 7. ✅ App Logo above QR Code
             ctx.textAlign = 'center';
             ctx.font = 'bold 24px monospace';
             ctx.fillStyle = '#64748b';
