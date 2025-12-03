@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// ✅ Config ของจริง (ตามที่คุณให้มา)
 const firebaseConfig = {
   apiKey: "AIzaSyBgY8LtzHjWazxYgqBLrFDm0wDwIAsbjfw",
   authDomain: "starcatcher-s.firebaseapp.com",
