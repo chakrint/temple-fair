@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "firebase": "^10.12.2",
     "@worldcoin/minikit-js": "^1.1.0",
     "ethers": "^6.11.1",
     "lucide-react": "^0.344.0",
