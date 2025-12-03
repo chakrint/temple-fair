@@ -11,10 +11,11 @@ import {
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.2.0 (Vercel Update)";
+const APP_VERSION = "V.2.1 (QR Code Added)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
+const APP_URL = "https://temple-fair.vercel.app"; // ✅ ลิงก์สำหรับ QR Code
 
 // --- 1. Database ของรางวัล ---
 const REWARDS_DB = [
@@ -139,7 +140,11 @@ export default function StarCatcherApp() {
             });
         };
 
-        loadImage(rewardItem.img).then((img) => {
+        // โหลดรูป 2 อย่าง: ของรางวัล และ QR Code
+        Promise.all([
+            loadImage(rewardItem.img),
+            loadImage(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(APP_URL)}&color=000000&bgcolor=ffffff&margin=10`) // ✅ QR Code API
+        ]).then(([img, qrImg]) => {
             // 3. Main Image
             const imgSize = 500;
             const x = (size - imgSize) / 2;
@@ -180,10 +185,22 @@ export default function StarCatcherApp() {
             }
             ctx.fillText(line, size/2, lineY);
 
-            // 6. App Logo
-            ctx.font = 'bold 30px monospace';
+            // 6. App Logo (Left)
+            ctx.textAlign = 'left';
+            ctx.font = 'bold 40px monospace';
             ctx.fillStyle = '#64748b';
-            ctx.fillText("Star Catcher", size/2, size - 50);
+            ctx.fillText("Star Catcher", 50, size - 50);
+
+            // 7. ✅ Draw QR Code (Right Bottom)
+            const qrSize = 180; // ขนาด QR Code
+            const qrPadding = 40; // ระยะห่างจากขอบ
+            ctx.drawImage(qrImg, size - qrSize - qrPadding, size - qrSize - qrPadding, qrSize, qrSize);
+            
+            // Text "Scan to Play" above QR
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText("Scan to Play", size - qrSize/2 - qrPadding, size - qrSize - qrPadding - 10);
 
             canvas.toBlob((blob) => {
                 if(blob) {
@@ -197,12 +214,10 @@ export default function StarCatcherApp() {
     });
   };
 
-  // ✅ ฟังก์ชันแชร์แบบใหม่ (เพิ่มข้อความเชิญชวน)
   const handleShare = async (fromModal = false) => {
-    // ✅ ใช้ Vercel URL ตามที่แจ้ง
-    const shareUrl = typeof window !== 'undefined' ? window.location.origin : "https://temple-fair.vercel.app";
+    const shareUrl = typeof window !== 'undefined' ? window.location.origin : APP_URL;
     
-    // Default Share Data (หน้าแรก)
+    // Default Share Data
     let shareData: any = {
         title: 'Star Catcher',
         text: lang === 'th' 
@@ -211,14 +226,13 @@ export default function StarCatcherApp() {
         url: shareUrl
     };
 
-    // Reward Share Data (มีรูป + คำอวยพร)
+    // Reward Share Data
     if (fromModal && reward) {
         setIsGeneratingCard(true);
         try {
             const file = await generateCardImage(reward);
             const itemName = lang === 'th' ? reward.name.th : reward.name.en;
             
-            // 🌟 ข้อความอวยพร + ลิงก์
             const blessingText = lang === 'th'
                 ? `เพื่อนคุณส่งคำอวยพรมาให้พร้อมกับ "${itemName}" 🎁\nขอให้สิ่งดีๆ เกิดขึ้นกับคุณนะ! ✨\n\nมาลองคว้าดาวของคุณบ้างที่นี่เลย 👇\n${shareUrl}`
                 : `Your friend sent you a blessing with "${itemName}" 🎁\nWishing you all the best! ✨\n\nCatch your own star here 👇\n${shareUrl}`;
@@ -228,15 +242,12 @@ export default function StarCatcherApp() {
                     files: [file],
                     title: 'Gift from the Stars',
                     text: blessingText,
-                    // url: shareUrl // บาง OS ถ้าแนบไฟล์แล้ว url อาจไม่ขึ้น เลยรวมใน text ไปเลยชัวร์กว่า
                 });
             } else {
-                // กรณีแชร์ไฟล์ไม่ได้ (Fallback)
                 shareData.text = blessingText;
                 await navigator.share(shareData);
             }
         } catch (e) {
-            // ถ้าแชร์ไม่ได้จริงๆ (เช่น User กดปิด หรือ Browser ไม่รองรับ)
             console.log("Share dismissed/failed, falling back to clipboard");
             try {
                 await navigator.clipboard.writeText(shareData.text);
@@ -248,7 +259,6 @@ export default function StarCatcherApp() {
         return;
     }
 
-    // กรณีแชร์หน้าแรก
     try {
         if (navigator.share) await navigator.share(shareData);
         else {
@@ -265,7 +275,7 @@ export default function StarCatcherApp() {
     if(file) {
         const link = document.createElement('a');
         link.href = URL.createObjectURL(file);
-        link.download = `StarCatcher-Card.png`;
+        link.download = `StarCatcher-${reward.name.en.replace(/\s+/g, '-')}.png`;
         link.click();
     }
     setIsGeneratingCard(false);
