@@ -11,7 +11,7 @@ import {
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.2.1 (QR Code Added)";
+const APP_VERSION = "V.2.2 (Fix QR & Text)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
@@ -167,40 +167,40 @@ export default function StarCatcherApp() {
             ctx.font = '40px sans-serif';
             ctx.fillStyle = '#e2e8f0';
             
+            // ✅ ปรับขนาด QR Code ให้เล็กลง
+            const qrSize = 150; 
+            const qrPadding = 40;
+
             const words = desc.split(' ');
             let line = '';
             let lineY = y + imgSize + 180;
-            const maxWidth = size - 200;
+            // ✅ ปรับ maxWidth ให้ข้อความไม่ทับ QR Code
+            const maxWidth = size - (qrSize + qrPadding * 2) - 100; 
+
+            ctx.textAlign = 'left'; // จัดชิดซ้ายเพื่อให้ตัดคำสวยงาม
+            const textX = 100; // เริ่มต้นข้อความจากซ้าย
 
             for(let n = 0; n < words.length; n++) {
                 const testLine = line + words[n] + ' ';
                 const metrics = ctx.measureText(testLine);
                 if (metrics.width > maxWidth && n > 0) {
-                    ctx.fillText(line, size/2, lineY);
+                    ctx.fillText(line, textX, lineY);
                     line = words[n] + ' ';
                     lineY += 60;
                 } else {
                     line = testLine;
                 }
             }
-            ctx.fillText(line, size/2, lineY);
+            ctx.fillText(line, textX, lineY);
 
-            // 6. App Logo (Left)
-            ctx.textAlign = 'left';
-            ctx.font = 'bold 40px monospace';
-            ctx.fillStyle = '#64748b';
-            ctx.fillText("Star Catcher", 50, size - 50);
-
-            // 7. ✅ Draw QR Code (Right Bottom)
-            const qrSize = 180; // ขนาด QR Code
-            const qrPadding = 40; // ระยะห่างจากขอบ
+            // 6. ✅ Draw QR Code (Right Bottom)
             ctx.drawImage(qrImg, size - qrSize - qrPadding, size - qrSize - qrPadding, qrSize, qrSize);
             
-            // Text "Scan to Play" above QR
+            // 7. ✅ App Logo above QR Code (แทนที่ Scan to Play และ Star Catcher ด้านซ้าย)
             ctx.textAlign = 'center';
-            ctx.font = 'bold 20px sans-serif';
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText("Scan to Play", size - qrSize/2 - qrPadding, size - qrSize - qrPadding - 10);
+            ctx.font = 'bold 24px monospace';
+            ctx.fillStyle = '#64748b';
+            ctx.fillText("Star Catcher", size - qrSize/2 - qrPadding, size - qrSize - qrPadding - 15);
 
             canvas.toBlob((blob) => {
                 if(blob) {
