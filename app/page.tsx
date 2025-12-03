@@ -5,13 +5,13 @@ import { MiniKit } from '@worldcoin/minikit-js';
 import { 
   Sparkles, Star, Cloud, Candy, Flame, Stethoscope, 
   Cat, Bird, Sprout, Rocket, Zap, Crown, 
-  Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet, Share2, Download // ✅ เพิ่ม Download icon
+  Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet, Share2, Download
 } from "lucide-react";
 
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.1.7 (Save Image)";
+const APP_VERSION = "V.1.8 (Card Generator)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
@@ -53,8 +53,8 @@ export default function StarCatcherApp() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [targetItem, setTargetItem] = useState<{ type: string, id?: string | number } | null>(null);
   const [reward, setReward] = useState<any>(null);
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false); // สถานะตอนสร้างการ์ด
   
-  // Visual States
   const [stars, setStars] = useState<any[]>([]);
   const [isSunBig, setIsSunBig] = useState(false);
   const [moonRotation, setMoonRotation] = useState(0);
@@ -64,7 +64,6 @@ export default function StarCatcherApp() {
     try {
         const appId = process.env.NEXT_PUBLIC_APP_ID || "app_staging_dummy";
         MiniKit.install(appId); 
-        console.log("MiniKit Installed Status:", MiniKit.isInstalled());
     } catch (e) {
         console.warn("MiniKit install warning:", e);
     }
@@ -100,47 +99,169 @@ export default function StarCatcherApp() {
   const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
   const handleDisconnect = () => setUserAddress("");
 
-  const handleShare = async (fromModal = false) => {
-    const shareUrl = typeof window !== 'undefined' ? window.location.origin : "https://temple-fair.netlify.app";
-    let shareData = {
-        title: 'Star Catcher',
-        text: lang === 'th' ? 'มาคว้าดาวและสะสมของขวัญดิจิทัลกันเถอะ! ✨' : 'Catch stars and collect cute digital items with me! ✨',
-        url: shareUrl
-    };
+  // --- 🎨 ระบบวาดการ์ด (Canvas Generator) ---
+  const generateCardImage = async (rewardItem: any): Promise<File | null> => {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(null);
 
-    if (fromModal && reward) {
-        const itemName = lang === 'th' ? reward.name.th : reward.name.en;
-        shareData.text = lang === 'th'
-            ? `ฉันจับได้ "${itemName}" ใน Star Catcher! 🌟 คุณจะจับได้อะไรนะ?`
-            : `I just caught a "${itemName}" in Star Catcher! 🌟 Can you find one too?`;
+        // ตั้งขนาดการ์ด (สี่เหลี่ยมจัตุรัสชัดๆ)
+        const size = 1080;
+        canvas.width = size;
+        canvas.height = size;
+
+        // 1. วาดพื้นหลัง (Gradient สวยๆ)
+        const gradient = ctx.createLinearGradient(0, 0, 0, size);
+        gradient.addColorStop(0, '#0f172a'); // สีน้ำเงินเข้มเกือบดำ
+        gradient.addColorStop(1, '#334155'); // สีเทาอมฟ้า
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+
+        // 2. วาดดาวตกแต่ง (Random Stars)
+        ctx.fillStyle = '#ffffff';
+        for(let i=0; i<50; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * size;
+            const r = Math.random() * 3;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        // ฟังก์ชันโหลดรูป
+        const loadImage = (src: string) => {
+            return new Promise<HTMLImageElement>((r) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous"; // สำคัญสำหรับรูปข้าม domain
+                img.src = src;
+                img.onload = () => r(img);
+                img.onerror = () => r(img); // กัน error
+            });
+        };
+
+        // เริ่มวาดรูปและข้อความ
+        loadImage(rewardItem.img).then((img) => {
+            // 3. วาดรูปของรางวัลตรงกลาง
+            const imgSize = 500;
+            const x = (size - imgSize) / 2;
+            const y = (size - imgSize) / 2 - 100; // ขยับขึ้นหน่อย
+            
+            // วาดเงาหลังรูป
+            ctx.shadowColor = "rgba(255, 255, 255, 0.5)";
+            ctx.shadowBlur = 50;
+            ctx.drawImage(img, x, y, imgSize, imgSize);
+            ctx.shadowBlur = 0; // Reset shadow
+
+            // 4. วาดชื่อรางวัล
+            const name = lang === 'th' ? rewardItem.name.th : rewardItem.name.en;
+            ctx.font = 'bold 80px sans-serif';
+            ctx.fillStyle = '#fcd34d'; // สีเหลืองทอง
+            ctx.textAlign = 'center';
+            ctx.fillText(name, size/2, y + imgSize + 100);
+
+            // 5. วาดคำอวยพร
+            const desc = lang === 'th' ? rewardItem.desc.th : rewardItem.desc.en;
+            ctx.font = '40px sans-serif';
+            ctx.fillStyle = '#e2e8f0'; // สีขาวควันบุหรี่
+            
+            // ตัดคำยาวๆ (Wrap Text แบบง่ายๆ)
+            const words = desc.split(' ');
+            let line = '';
+            let lineY = y + imgSize + 180;
+            const maxWidth = size - 200;
+
+            for(let n = 0; n < words.length; n++) {
+                const testLine = line + words[n] + ' ';
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && n > 0) {
+                    ctx.fillText(line, size/2, lineY);
+                    line = words[n] + ' ';
+                    lineY += 60;
+                } else {
+                    line = testLine;
+                }
+            }
+            ctx.fillText(line, size/2, lineY);
+
+            // 6. วาดโลโก้แอพเล็กๆ ด้านล่าง
+            ctx.font = 'bold 30px monospace';
+            ctx.fillStyle = '#64748b';
+            ctx.fillText("Star Catcher", size/2, size - 50);
+
+            // 7. แปลงเป็นไฟล์
+            canvas.toBlob((blob) => {
+                if(blob) {
+                    const file = new File([blob], `card-${Date.now()}.png`, { type: 'image/png' });
+                    resolve(file);
+                } else {
+                    resolve(null);
+                }
+            }, 'image/png');
+        });
+    });
+  };
+
+  // ✅ ฟังก์ชันแชร์แบบใหม่ (แชร์ไฟล์ภาพ)
+  const handleShare = async (fromModal = false) => {
+    // ถ้าแชร์ลิงก์หน้าแรก (แบบไม่มีรางวัล)
+    if (!fromModal || !reward) {
+        const shareUrl = typeof window !== 'undefined' ? window.location.origin : "https://temple-fair.netlify.app";
+        const shareData = {
+            title: 'Star Catcher',
+            text: lang === 'th' ? 'มาคว้าดาวกัน! ✨' : 'Catch stars with me! ✨',
+            url: shareUrl
+        };
+        try {
+            if (navigator.share) await navigator.share(shareData);
+            else await navigator.clipboard.writeText(shareData.url);
+        } catch(e) {}
+        return;
     }
 
+    // ถ้าแชร์รางวัล -> สร้างการ์ด
+    setIsGeneratingCard(true);
     try {
-        if (navigator.share) {
-            await navigator.share(shareData);
-        } else {
-            await navigator.clipboard.writeText(shareData.url);
-            alert(lang === 'th' ? 'คัดลอกลิงก์เรียบร้อย!' : 'Link copied to clipboard!');
+        const file = await generateCardImage(reward);
+        if (file) {
+            // เช็คว่าแชร์ไฟล์ได้ไหม (Mobile ส่วนใหญ่ได้)
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'My Star Catcher Reward',
+                    text: lang === 'th' ? `ฉันได้ ${reward.name.th} ล่ะ! ✨` : `I got ${reward.name.en}! ✨`
+                });
+            } else {
+                // ถ้าแชร์ไฟล์ไม่ได้ (เช่น บนคอม) ให้โหลดแทน
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(file);
+                link.download = file.name;
+                link.click();
+                alert(lang === 'th' ? 'บันทึกการ์ดเรียบร้อย!' : 'Card saved!');
+            }
         }
     } catch (e) {
-        console.log("Share dismissed");
+        console.error("Share failed", e);
+        alert("Could not create card image");
+    } finally {
+        setIsGeneratingCard(false);
     }
   };
 
-  // ✅ New Download Function
-  const handleDownload = () => {
-    if (!reward || !reward.img) return;
-    
-    // สร้าง Link ปลอมๆ เพื่อกด Download
-    const link = document.createElement('a');
-    link.href = reward.img;
-    // ตั้งชื่อไฟล์ที่จะเซฟ (เช่น StarCatcher-Baby-Gold-Dragon.png)
-    link.download = `StarCatcher-${reward.name.en.replace(/\s+/g, '-')}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async () => {
+    if (!reward) return;
+    setIsGeneratingCard(true);
+    const file = await generateCardImage(reward);
+    if(file) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(file);
+        link.download = `StarCatcher-Card.png`;
+        link.click();
+    }
+    setIsGeneratingCard(false);
   };
 
+  // ... (ฟังก์ชัน Connect และอื่นๆ เหมือนเดิม) ...
   const handleConnect = async () => {
     if (!MiniKit.isInstalled()) {
         console.log("Browser Mode: Mocking Login...");
@@ -148,7 +269,6 @@ export default function StarCatcherApp() {
         alert("Running in Browser Mode: Logged in as Mock User!");
         return;
     }
-
     try {
         const res = await MiniKit.commands.walletAuth({
             nonce: crypto.randomUUID(),
@@ -156,7 +276,6 @@ export default function StarCatcherApp() {
             expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
             notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000),
         });
-
         if (res && (res as any).status === 'success') {
              const addr = (res as any).address || (res as any).commandPayload?.address || "0xConnectedUser";
              setUserAddress(addr);
@@ -166,7 +285,6 @@ export default function StarCatcherApp() {
         }
     } catch (error) {
         console.error("Login Error:", error);
-        alert("Login Failed. Please try again.");
     }
   };
 
@@ -203,7 +321,6 @@ export default function StarCatcherApp() {
 
     try {
         const res = await MiniKit.commands.sendTransaction(txPayload);
-        
         if (res && ((res as any).status === 'success' || (res as any).transactionHash)) {
             if (mode === "FREE") finalizeCatch(type, id);
             else { setShowPayModal(false); finalizeCatch(type, id); }
@@ -211,7 +328,6 @@ export default function StarCatcherApp() {
              if (mode === "FREE") setShowPayModal(true);
         }
     } catch (error) {
-        console.error("Tx Error:", error);
         if (mode === "FREE") setShowPayModal(true);
         else alert("Transaction Failed");
     } finally {
@@ -234,7 +350,6 @@ export default function StarCatcherApp() {
         else if (rand < 95) selectedId = Math.floor(Math.random() * 3) + 5;
         else selectedId = Math.floor(Math.random() * 3) + 8;
       }
-      
       const item = REWARDS_DB.find(r => r.id === selectedId);
       setReward(item);
       setShowModal(true);
@@ -293,7 +408,6 @@ export default function StarCatcherApp() {
              </DriftingText>
         </div>
 
-        {/* ☀️ Sun */}
         <div className="absolute top-10 left-4 md:left-20 pointer-events-auto z-40">
             <button onClick={() => handleItemClick('sun')} disabled={isProcessing}
                 className={`transition-all duration-500 flex flex-col items-center group ${isSunBig ? 'scale-150 cursor-pointer' : 'scale-75 cursor-default opacity-50 grayscale-[50%]'}`}>
@@ -302,7 +416,6 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        {/* 🌙 Moon */}
         <div className="absolute top-10 right-4 md:right-20 pointer-events-auto z-40">
             <button onClick={() => handleItemClick('moon')} disabled={isProcessing}
                 className={`transition-all duration-700 flex flex-col items-center group ${isFullMoon ? 'scale-125 cursor-pointer' : 'scale-90 cursor-default opacity-80'}`}
@@ -316,7 +429,6 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        {/* ⭐ Stars */}
         <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
             {stars.map((star) => (
                 <button
@@ -337,23 +449,16 @@ export default function StarCatcherApp() {
             ))}
         </div>
 
-        {/* ✅ Bottom Right Buttons (Donate & Share) */}
         <div className="absolute bottom-6 right-6 pointer-events-auto z-40 flex flex-col items-end gap-3">
-            
-            {/* Share Button */}
             <button onClick={() => handleShare(false)} className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-full border border-white/20 transition-all backdrop-blur-sm">
                 <Share2 size={18} />
             </button>
-
-            {/* Donate Button */}
             <button onClick={handleDonate} className="flex items-center gap-2 px-4 py-2 bg-pink-500/20 hover:bg-pink-500/80 text-pink-200 hover:text-white rounded-full border border-pink-500/50 transition-all text-xs font-bold backdrop-blur-sm">
                 <Heart size={14} className="fill-pink-500 text-pink-500" /> {lang === 'th' ? "สนับสนุน" : "Donate"}
             </button>
-            
             <span className="text-[10px] text-white/30 font-mono tracking-widest select-none">{APP_VERSION}</span>
         </div>
 
-        {/* Loading Indicator */}
         {isProcessing && (
             <div className="absolute bottom-20 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-5 z-30">
                 <Sparkles className="animate-spin text-yellow-400 w-4 h-4" />
@@ -362,7 +467,6 @@ export default function StarCatcherApp() {
         )}
       </main>
 
-      {/* Pay Modal */}
       {showPayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in">
             <div className="bg-gradient-to-b from-gray-900 to-black border border-yellow-500/30 p-8 rounded-3xl max-w-sm text-center shadow-2xl">
@@ -379,7 +483,6 @@ export default function StarCatcherApp() {
         </div>
       )}
 
-      {/* Reward Modal */}
       {showModal && reward && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-300">
           <div className="bg-white text-gray-900 rounded-[2rem] p-8 w-full max-w-sm text-center relative shadow-[0_0_60px_rgba(255,255,255,0.4)] transform scale-100 animate-bounce-slow overflow-visible border-4 border-white/50">
@@ -387,13 +490,12 @@ export default function StarCatcherApp() {
                 {reward.type}
             </div>
             
-            {/* ✅ Action Buttons (Download & Share) */}
             <div className="absolute top-4 left-4 flex gap-2">
-                <button onClick={handleDownload} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-all" title="Save Image">
-                    <Download size={14} />
+                <button onClick={handleDownload} disabled={isGeneratingCard} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-all disabled:opacity-50" title="Save Card">
+                    {isGeneratingCard ? <Sparkles size={14} className="animate-spin" /> : <Download size={14} />}
                 </button>
-                <button onClick={() => handleShare(true)} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-all" title="Share Reward">
-                    <Share2 size={14} />
+                <button onClick={() => handleShare(true)} disabled={isGeneratingCard} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-all disabled:opacity-50" title="Share Card">
+                    {isGeneratingCard ? <Sparkles size={14} className="animate-spin" /> : <Share2 size={14} />}
                 </button>
             </div>
 
@@ -419,7 +521,6 @@ export default function StarCatcherApp() {
         </div>
       )}
 
-      {/* Global CSS for Animations (Standard Tailwind Compatible) */}
       <style jsx global>{`
         .pause-on-hover:hover { animation-play-state: paused !important; }
         .animate-spin-slow { animation: spin 10s linear infinite; }
