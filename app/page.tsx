@@ -11,7 +11,7 @@ import {
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.2.8 (Moon Click Fixed)";
+const APP_VERSION = "V.2.9 (Moon & Star Tweak)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
@@ -121,24 +121,36 @@ export default function StarCatcherApp() {
     } catch (e) { console.warn("MiniKit install warning:", e); }
   }, []);
 
-  // Stars Logic
+  // ✅ Stars Logic (Updated V2.9: Rotation & Floating Logic)
   useEffect(() => {
     const newStars = [];
-    const RUNNING_STARS_MIN = 5;
-    const RUNNING_STARS_MAX = 15;
-    const count = Math.floor(Math.random() * (RUNNING_STARS_MAX - RUNNING_STARS_MIN + 1)) + RUNNING_STARS_MIN;
-    const moveTypes = ['flyRight', 'flyUp', 'curvePath'];
-    for (let i = 0; i < count; i++) {
+    let idCounter = 0;
+
+    const FLOATING_STARS = 3;
+    const RUNNING_STARS_MIN = 3;
+    const RUNNING_STARS_MAX = 8;
+
+    // 1. Floating Stars (ขยับน้อยๆ) - ใช้ Component FloatingStar จัดการ (render แยกด้านล่าง)
+    // ตรงนี้เราจัดการเฉพาะ Running Stars (ดาววิ่ง)
+
+    // 2. Running Stars (ดาววิ่ง) -> เปลี่ยนเป็นลอยขึ้น + หมุน
+    const runningCount = Math.floor(Math.random() * (RUNNING_STARS_MAX - RUNNING_STARS_MIN + 1)) + RUNNING_STARS_MIN;
+    
+    // สุ่มทิศทางการหมุน (ตามเข็ม / ทวนเข็ม)
+    const moveTypes = ['floatRotateUpCW', 'floatRotateUpCCW']; 
+
+    for (let i = 0; i < runningCount; i++) {
         newStars.push({
-            id: i,
+            id: idCounter++,
             left: Math.random() * 90 + 5,
             top: Math.random() * 80 + 10,
             size: Math.random() * 0.5 + 0.5,
             animType: moveTypes[Math.floor(Math.random() * moveTypes.length)],
-            duration: Math.random() * 20 + 10,
+            duration: Math.random() * 15 + 15, // 15-30 วินาที ให้มีเวลาหมุนครบ
             delay: Math.random() * 10
         });
     }
+
     setRunningStars(newStars);
   }, []);
 
@@ -153,22 +165,26 @@ export default function StarCatcherApp() {
     return () => { clearTimeout(initialHide); clearInterval(interval); };
   }, []);
 
-  // ✅ Moon Movement
+  // Moon Movement
   useEffect(() => {
     const moveMoon = () => {
         setMoonPos({
-            top: Math.random() * 60 + 10, // 10% - 70%
-            right: Math.random() * 80 + 10 // 10% - 90%
+            top: Math.random() * 60 + 10, 
+            right: Math.random() * 80 + 10 
         });
     };
     const interval = setInterval(moveMoon, 10000); 
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Moon Rotation
+  // ✅ Moon Rotation Logic (Updated V2.9: Random Time 3-33s)
   useEffect(() => {
     if (!isFullMoon && moonRotation === 0) {
-        setTargetMoonRotation(360 * (Math.floor(Math.random() * 10) + 1));
+        // คำนวณ: ความเร็ว 3 deg / 50ms = 60 deg / sec
+        // ต้องการสุ่ม 3 - 33 วินาที
+        // Target = Time * 60
+        const randomSeconds = Math.random() * 30 + 3; // 3 ถึง 33 วินาที
+        setTargetMoonRotation(randomSeconds * 60); 
     }
   }, [isFullMoon, moonRotation]);
 
@@ -186,7 +202,7 @@ export default function StarCatcherApp() {
             return targetMoonRotation;
         }
         
-        return prev + 3; 
+        return prev + 3; // คงความเร็วเดิม
       });
     }, 50);
     return () => clearInterval(interval);
@@ -371,12 +387,16 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        {/* 🌠 Running Stars */}
+        {/* 🌠 Running Stars (Updated V2.9: Rotate + Fade + Up) */}
         <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
             {runningStars.map((star) => (
                 <button key={star.id} onClick={() => handleItemClick('star', star.id)} disabled={isProcessing} className="absolute pointer-events-auto outline-none group pause-on-hover hover:z-50 transition-all duration-300"
-                    style={{ left: `${star.left}%`, top: `${star.top}%`, animation: `${star.animType} ${star.duration}s infinite linear ${star.delay}s` }}>
-                    <Star size={24 * star.size} className={`drop-shadow-[0_0_15px_rgba(255,255,0,0.6)] ${star.animType === 'flyRight' ? 'text-cyan-100 fill-white animate-pulse' : 'text-yellow-100 fill-yellow-50/50'} group-hover:text-white group-hover:fill-white`} strokeWidth={1.5} />
+                    style={{ 
+                        left: `${star.left}%`, 
+                        top: `${star.top}%`, 
+                        animation: `${star.animType} ${star.duration}s linear ${star.delay}s infinite` // Use new animType
+                    }}>
+                    <Star size={24 * star.size} className={`drop-shadow-[0_0_15px_rgba(255,255,0,0.6)] text-yellow-100 fill-yellow-50/50 group-hover:text-white group-hover:fill-white`} strokeWidth={1.5} />
                     <div className="opacity-0 group-hover:opacity-100 absolute -bottom-1 -right-1 transition-opacity duration-200 pointer-events-none"><Hand className="text-white drop-shadow-md rotate-[-20deg]" size={20} /></div>
                 </button>
             ))}
@@ -440,6 +460,22 @@ export default function StarCatcherApp() {
         .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes float { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(10px, -15px) rotate(5deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+        
+        /* ✅ New Running Star Animations: Up + Rotate + FadeOut */
+        @keyframes floatRotateUpCW {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(-20vh) rotate(1800deg); opacity: 0; } /* 1800deg = 5 rounds */
+        }
+        @keyframes floatRotateUpCCW {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(-20vh) rotate(-1800deg); opacity: 0; } /* -1800deg = 5 rounds */
+        }
+
+        /* Legacy (Unused but kept for safety) */
         @keyframes flyRight { 0% { transform: translate(-10vw, 0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translate(100vw, 20px); opacity: 0; } }
         @keyframes flyUp { 0% { transform: translate(0, 100vh); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(-20px, -20vh); opacity: 0; } }
         @keyframes curvePath { 0% { transform: translate(-50px, 0); opacity: 0; } 20% { opacity: 1; } 50% { transform: translate(30vw, -100px); } 80% { opacity: 1; } 100% { transform: translate(60vw, 50px); opacity: 0; } }
