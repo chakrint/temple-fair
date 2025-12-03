@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { MiniKit } from '@worldcoin/minikit-js';
 import { 
   Sparkles, Star, Cloud, Candy, Flame, Stethoscope, 
@@ -10,12 +10,19 @@ import {
 
 import TwinklingStars from "@/components/TwinklingStars"; 
 
+// ✅ Import Firebase
+import { db } from "@/lib/firebase"; 
+import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
+
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.2.9 (Moon & Star Tweak)";
+const APP_VERSION = "V.3.1 (Test Mode Support)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
-const APP_URL = "https://temple-fair.vercel.app"; 
+const APP_URL = "[https://temple-fair.vercel.app](https://temple-fair.vercel.app)"; 
+
+// ✅ ตัวแปรเช็ค Test Mode (อ่านจาก Environment Variable)
+const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
 
 // --- 1. Database ของรางวัล ---
 const REWARDS_DB = [
@@ -110,7 +117,7 @@ export default function StarCatcherApp() {
   const [moonRotation, setMoonRotation] = useState(0);
   const [isFullMoon, setIsFullMoon] = useState(false);
   
-  // ✅ Moon States
+  // Moon States
   const [moonPos, setMoonPos] = useState({ top: 15, right: 10 });
   const [targetMoonRotation, setTargetMoonRotation] = useState(360);
 
@@ -121,22 +128,14 @@ export default function StarCatcherApp() {
     } catch (e) { console.warn("MiniKit install warning:", e); }
   }, []);
 
-  // ✅ Stars Logic (Updated V2.9: Rotation & Floating Logic)
+  // Stars Logic
   useEffect(() => {
     const newStars = [];
     let idCounter = 0;
-
-    const FLOATING_STARS = 3;
     const RUNNING_STARS_MIN = 3;
     const RUNNING_STARS_MAX = 8;
 
-    // 1. Floating Stars (ขยับน้อยๆ) - ใช้ Component FloatingStar จัดการ (render แยกด้านล่าง)
-    // ตรงนี้เราจัดการเฉพาะ Running Stars (ดาววิ่ง)
-
-    // 2. Running Stars (ดาววิ่ง) -> เปลี่ยนเป็นลอยขึ้น + หมุน
     const runningCount = Math.floor(Math.random() * (RUNNING_STARS_MAX - RUNNING_STARS_MIN + 1)) + RUNNING_STARS_MIN;
-    
-    // สุ่มทิศทางการหมุน (ตามเข็ม / ทวนเข็ม)
     const moveTypes = ['floatRotateUpCW', 'floatRotateUpCCW']; 
 
     for (let i = 0; i < runningCount; i++) {
@@ -146,11 +145,10 @@ export default function StarCatcherApp() {
             top: Math.random() * 80 + 10,
             size: Math.random() * 0.5 + 0.5,
             animType: moveTypes[Math.floor(Math.random() * moveTypes.length)],
-            duration: Math.random() * 15 + 15, // 15-30 วินาที ให้มีเวลาหมุนครบ
+            duration: Math.random() * 15 + 15, 
             delay: Math.random() * 10
         });
     }
-
     setRunningStars(newStars);
   }, []);
 
@@ -177,13 +175,10 @@ export default function StarCatcherApp() {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Moon Rotation Logic (Updated V2.9: Random Time 3-33s)
+  // Moon Rotation Logic
   useEffect(() => {
     if (!isFullMoon && moonRotation === 0) {
-        // คำนวณ: ความเร็ว 3 deg / 50ms = 60 deg / sec
-        // ต้องการสุ่ม 3 - 33 วินาที
-        // Target = Time * 60
-        const randomSeconds = Math.random() * 30 + 3; // 3 ถึง 33 วินาที
+        const randomSeconds = Math.random() * 30 + 3; 
         setTargetMoonRotation(randomSeconds * 60); 
     }
   }, [isFullMoon, moonRotation]);
@@ -192,17 +187,12 @@ export default function StarCatcherApp() {
     const interval = setInterval(() => {
       setMoonRotation((prev) => {
         if (isFullMoon) return prev; 
-        
         if (prev >= targetMoonRotation) {
             setIsFullMoon(true);
-            setTimeout(() => { 
-                setIsFullMoon(false); 
-                setMoonRotation(0); 
-            }, 5000); 
+            setTimeout(() => { setIsFullMoon(false); setMoonRotation(0); }, 5000); 
             return targetMoonRotation;
         }
-        
-        return prev + 3; // คงความเร็วเดิม
+        return prev + 3; 
       });
     }, 50);
     return () => clearInterval(interval);
@@ -211,23 +201,54 @@ export default function StarCatcherApp() {
   const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
   const handleDisconnect = () => setUserAddress("");
 
-  // Canvas Generator & Share
+  // ✅ Firebase Quota Check Function (Updated V3.1)
+  const checkAndIncrementQuota = async (address: string): Promise<boolean> => {
+    // 1. ถ้าเป็น Test Mode หรือ Mock User -> ให้ผ่านตลอด (Unlimited)
+    if (IS_TEST_MODE || !address || address === MOCK_WALLET) {
+        console.log("🚀 Test Mode/Mock: Unlimited Quota!");
+        return true; 
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const userRef = doc(db, "users", address);
+
+    try {
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+            await setDoc(userRef, { lastPlayed: todayStr, count: 1 });
+            return true;
+        } else {
+            const data = userSnap.data();
+            if (data.lastPlayed !== todayStr) {
+                await updateDoc(userRef, { lastPlayed: todayStr, count: 1 });
+                return true;
+            } else {
+                if (data.count < 3) {
+                    await updateDoc(userRef, { count: increment(1) });
+                    return true;
+                } else {
+                    return false; // Quota Full
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Firebase Error:", e);
+        return true; 
+    }
+  };
+
   const generateCardImage = async (rewardItem: any): Promise<File | null> => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) return resolve(null);
-        const size = 1080;
-        canvas.width = size;
-        canvas.height = size;
+        const size = 1080; canvas.width = size; canvas.height = size;
         const gradient = ctx.createLinearGradient(0, 0, 0, size);
         gradient.addColorStop(0, '#0f172a'); gradient.addColorStop(1, '#334155');
         ctx.fillStyle = gradient; ctx.fillRect(0, 0, size, size);
         ctx.fillStyle = '#ffffff';
-        for(let i=0; i<50; i++) {
-            const x = Math.random() * size; const y = Math.random() * size; const r = Math.random() * 3;
-            ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill();
-        }
+        for(let i=0; i<50; i++) { const x = Math.random() * size; const y = Math.random() * size; const r = Math.random() * 3; ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill(); }
         const loadImage = (src: string) => {
             return new Promise<HTMLImageElement>((r) => {
                 const img = new Image(); img.crossOrigin = "Anonymous"; img.src = src;
@@ -242,22 +263,17 @@ export default function StarCatcherApp() {
             ctx.shadowColor = "rgba(255, 255, 255, 0.5)"; ctx.shadowBlur = 50;
             ctx.drawImage(img, x, y, imgSize, imgSize); ctx.shadowBlur = 0;
             const name = lang === 'th' ? rewardItem.name.th : rewardItem.name.en;
-            ctx.font = 'bold 80px sans-serif'; ctx.fillStyle = '#fcd34d'; ctx.textAlign = 'center';
-            ctx.fillText(name, size/2, y + imgSize + 100);
+            ctx.font = 'bold 80px sans-serif'; ctx.fillStyle = '#fcd34d'; ctx.textAlign = 'center'; ctx.fillText(name, size/2, y + imgSize + 100);
             const desc = lang === 'th' ? rewardItem.desc.th : rewardItem.desc.en;
             ctx.font = '40px sans-serif'; ctx.fillStyle = '#e2e8f0';
             const qrSize = 150; const qrPadding = 40;
             const words = desc.split(' '); let line = ''; let lineY = y + imgSize + 180;
             const maxWidth = size - (qrSize + qrPadding * 2) - 100; 
             ctx.textAlign = 'left'; const textX = 100; 
-            for(let n = 0; n < words.length; n++) {
-                const testLine = line + words[n] + ' '; const metrics = ctx.measureText(testLine);
-                if (metrics.width > maxWidth && n > 0) { ctx.fillText(line, textX, lineY); line = words[n] + ' '; lineY += 60; } else { line = testLine; }
-            }
+            for(let n = 0; n < words.length; n++) { const testLine = line + words[n] + ' '; const metrics = ctx.measureText(testLine); if (metrics.width > maxWidth && n > 0) { ctx.fillText(line, textX, lineY); line = words[n] + ' '; lineY += 60; } else { line = testLine; } }
             ctx.fillText(line, textX, lineY);
             ctx.drawImage(qrImg, size - qrSize - qrPadding, size - qrSize - qrPadding, qrSize, qrSize);
-            ctx.textAlign = 'center'; ctx.font = 'bold 24px monospace'; ctx.fillStyle = '#64748b';
-            ctx.fillText("Star Catcher", size - qrSize/2 - qrPadding, size - qrSize - qrPadding - 15);
+            ctx.textAlign = 'center'; ctx.font = 'bold 24px monospace'; ctx.fillStyle = '#64748b'; ctx.fillText("Star Catcher", size - qrSize/2 - qrPadding, size - qrSize - qrPadding - 15);
             canvas.toBlob((blob) => { if(blob) { const file = new File([blob], `card-${Date.now()}.png`, { type: 'image/png' }); resolve(file); } else { resolve(null); } }, 'image/png');
         });
     });
@@ -265,11 +281,7 @@ export default function StarCatcherApp() {
 
   const handleShare = async (fromModal = false) => {
     const shareUrl = typeof window !== 'undefined' ? window.location.origin : APP_URL;
-    let shareData: any = {
-        title: 'Star Catcher',
-        text: lang === 'th' ? `มาคว้าดาวกัน! ✨ 👇\n${shareUrl}` : `Catch stars with me! ✨ 👇\n${shareUrl}`,
-        url: shareUrl
-    };
+    let shareData: any = { title: 'Star Catcher', text: lang === 'th' ? `มาคว้าดาวกัน! ✨ 👇\n${shareUrl}` : `Catch stars with me! ✨ 👇\n${shareUrl}`, url: shareUrl };
     if (fromModal && reward) {
         setIsGeneratingCard(true);
         try {
@@ -278,22 +290,14 @@ export default function StarCatcherApp() {
             const blessingText = lang === 'th'
                 ? `เพื่อนคุณส่งคำอวยพรมาให้พร้อมกับ "${itemName}" 🎁\nขอให้สิ่งดีๆ เกิดขึ้นกับคุณนะ! ✨\n\nมาลองคว้าดาวของคุณบ้างที่นี่เลย 👇\n${shareUrl}`
                 : `Your friend sent you a blessing with "${itemName}" 🎁\nWishing you all the best! ✨\n\nCatch your own star here 👇\n${shareUrl}`;
-            if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: 'Gift from the Stars', text: blessingText });
-            } else { shareData.text = blessingText; await navigator.share(shareData); }
+            if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Gift from the Stars', text: blessingText }); } else { shareData.text = blessingText; await navigator.share(shareData); }
         } catch (e) { console.log("Share failed"); } finally { setIsGeneratingCard(false); }
         return;
     }
     try { if (navigator.share) await navigator.share(shareData); else { await navigator.clipboard.writeText(shareData.text); alert(lang === 'th' ? 'คัดลอกลิงก์แล้ว!' : 'Link copied!'); } } catch(e) {}
   };
 
-  const handleDownload = async () => {
-    if (!reward) return;
-    setIsGeneratingCard(true);
-    const file = await generateCardImage(reward);
-    if(file) { const link = document.createElement('a'); link.href = URL.createObjectURL(file); link.download = `StarCatcher-${reward.name.en.replace(/\s+/g, '-')}.png`; link.click(); }
-    setIsGeneratingCard(false);
-  };
+  const handleDownload = async () => { if (!reward) return; setIsGeneratingCard(true); const file = await generateCardImage(reward); if(file) { const link = document.createElement('a'); link.href = URL.createObjectURL(file); link.download = `StarCatcher-${reward.name.en.replace(/\s+/g, '-')}.png`; link.click(); } setIsGeneratingCard(false); };
 
   const handleConnect = async () => {
     if (!MiniKit.isInstalled()) { setUserAddress(MOCK_WALLET); alert("Browser Mode: Logged in as Mock User!"); return; }
@@ -314,14 +318,28 @@ export default function StarCatcherApp() {
 
   const attemptCatch = async (mode: "FREE" | "PAID", type: string, id?: string | number) => {
     setIsProcessing(true);
-    setStatusMsg(mode === "FREE" ? "Catching..." : "Paying 1 SLG...");
+    setStatusMsg(mode === "FREE" ? "Checking Quota..." : "Paying 1 SLG...");
+
+    // ✅ 2. แทรกการเช็คโควตาตรงนี้
+    if (mode === "FREE") {
+        const hasQuota = await checkAndIncrementQuota(userAddress);
+        if (!hasQuota) {
+            setIsProcessing(false);
+            setShowPayModal(true); // โควตาเต็ม -> เด้งถามให้จ่ายเงิน
+            return; // หยุดการทำงาน ไม่ให้จับฟรี
+        }
+        setStatusMsg("Catching...");
+    }
+
     if (!MiniKit.isInstalled()) { setTimeout(() => { setIsProcessing(false); setStatusMsg(""); if (mode === "PAID") setShowPayModal(false); finalizeCatch(type, id); }, 2000); return; }
+    
+    // ... (ส่วน Transaction จ่ายเงิน เหมือนเดิม) ...
     const txPayload = { transaction: [{ address: CONTRACT_ADDRESS, abi: [], functionName: mode === "FREE" ? "catchStarFree" : "catchStarPaid", args: [] }] };
     try {
         const res = await MiniKit.commands.sendTransaction(txPayload);
         if (res && ((res as any).status === 'success' || (res as any).transactionHash)) {
             if (mode === "FREE") finalizeCatch(type, id); else { setShowPayModal(false); finalizeCatch(type, id); }
-        } else { if (mode === "FREE") setShowPayModal(true); }
+        } else { if (mode === "FREE") setShowPayModal(true); } 
     } catch (error) { if (mode === "FREE") setShowPayModal(true); else alert("Transaction Failed"); } finally { setIsProcessing(false); setStatusMsg(""); }
   };
 
@@ -369,7 +387,7 @@ export default function StarCatcherApp() {
 
         {/* 🌙 Moon (Fixed: Added pointer-events-auto) */}
         <div 
-            className="absolute z-40 transition-all duration-[8000ms] ease-in-out pointer-events-auto" // ✅ แก้ไขตรงนี้: เพิ่ม pointer-events-auto ให้ div แม่
+            className="absolute z-40 transition-all duration-[8000ms] ease-in-out pointer-events-auto"
             style={{ 
                 top: `${moonPos.top}%`, 
                 right: `${moonPos.right}%` 
@@ -387,15 +405,10 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        {/* 🌠 Running Stars (Updated V2.9: Rotate + Fade + Up) */}
+        {/* 🌠 Running Stars */}
         <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
             {runningStars.map((star) => (
-                <button key={star.id} onClick={() => handleItemClick('star', star.id)} disabled={isProcessing} className="absolute pointer-events-auto outline-none group pause-on-hover hover:z-50 transition-all duration-300"
-                    style={{ 
-                        left: `${star.left}%`, 
-                        top: `${star.top}%`, 
-                        animation: `${star.animType} ${star.duration}s linear ${star.delay}s infinite` // Use new animType
-                    }}>
+                <button key={star.id} onClick={() => handleItemClick('star', star.id)} disabled={isProcessing} className="absolute pointer-events-auto outline-none group pause-on-hover hover:z-50 transition-all duration-300" style={{ left: `${star.left}%`, top: `${star.top}%`, animation: `${star.animType} ${star.duration}s linear ${star.delay}s infinite` }}>
                     <Star size={24 * star.size} className={`drop-shadow-[0_0_15px_rgba(255,255,0,0.6)] text-yellow-100 fill-yellow-50/50 group-hover:text-white group-hover:fill-white`} strokeWidth={1.5} />
                     <div className="opacity-0 group-hover:opacity-100 absolute -bottom-1 -right-1 transition-opacity duration-200 pointer-events-none"><Hand className="text-white drop-shadow-md rotate-[-20deg]" size={20} /></div>
                 </button>
@@ -460,26 +473,22 @@ export default function StarCatcherApp() {
         .animate-spin-slow { animation: spin 10s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes float { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(10px, -15px) rotate(5deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
-        
-        /* ✅ New Running Star Animations: Up + Rotate + FadeOut */
+        @keyframes flyRight { 0% { transform: translate(-10vw, 0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translate(100vw, 20px); opacity: 0; } }
+        @keyframes flyUp { 0% { transform: translate(0, 100vh); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(-20px, -20vh); opacity: 0; } }
+        @keyframes curvePath { 0% { transform: translate(-50px, 0); opacity: 0; } 20% { opacity: 1; } 50% { transform: translate(30vw, -100px); } 80% { opacity: 1; } 100% { transform: translate(60vw, 50px); opacity: 0; } }
+        @keyframes rotateFade { 0% { opacity: 0; transform: rotate(0deg) scale(0.5); } 10% { opacity: 1; transform: rotate(108deg) scale(1); } 90% { opacity: 1; transform: rotate(972deg) scale(1); } 100% { opacity: 0; transform: rotate(1080deg) scale(0.5); } }
         @keyframes floatRotateUpCW {
             0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
             10% { opacity: 1; }
             80% { opacity: 1; }
-            100% { transform: translateY(-20vh) rotate(1800deg); opacity: 0; } /* 1800deg = 5 rounds */
+            100% { transform: translateY(-20vh) rotate(1800deg); opacity: 0; }
         }
         @keyframes floatRotateUpCCW {
             0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
             10% { opacity: 1; }
             80% { opacity: 1; }
-            100% { transform: translateY(-20vh) rotate(-1800deg); opacity: 0; } /* -1800deg = 5 rounds */
+            100% { transform: translateY(-20vh) rotate(-1800deg); opacity: 0; }
         }
-
-        /* Legacy (Unused but kept for safety) */
-        @keyframes flyRight { 0% { transform: translate(-10vw, 0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translate(100vw, 20px); opacity: 0; } }
-        @keyframes flyUp { 0% { transform: translate(0, 100vh); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(-20px, -20vh); opacity: 0; } }
-        @keyframes curvePath { 0% { transform: translate(-50px, 0); opacity: 0; } 20% { opacity: 1; } 50% { transform: translate(30vw, -100px); } 80% { opacity: 1; } 100% { transform: translate(60vw, 50px); opacity: 0; } }
-        @keyframes rotateFade { 0% { opacity: 0; transform: rotate(0deg) scale(0.5); } 10% { opacity: 1; transform: rotate(108deg) scale(1); } 90% { opacity: 1; transform: rotate(972deg) scale(1); } 100% { opacity: 0; transform: rotate(1080deg) scale(0.5); } }
       `}</style>
     </div>
   );
