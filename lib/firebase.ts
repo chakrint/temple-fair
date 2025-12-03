@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-
 const firebaseConfig = {
   apiKey: "AIzaSyBgY8LtzHjWazxYgqBLrFDm0wDwIAsbjfw",
   authDomain: "starcatcher-s.firebaseapp.com",
