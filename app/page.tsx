@@ -11,11 +11,11 @@ import {
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.2.2 (Fix QR & Text)";
+const APP_VERSION = "V.2.3 (Sun & Moon Logic)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
-const APP_URL = "https://temple-fair.vercel.app"; // ✅ ลิงก์สำหรับ QR Code
+const APP_URL = "https://temple-fair.vercel.app"; 
 
 // --- 1. Database ของรางวัล ---
 const REWARDS_DB = [
@@ -70,23 +70,39 @@ export default function StarCatcherApp() {
     }
   }, []);
 
+  // ✅ Stars Logic: เหลือ 3 ดวง และลดขนาด
   useEffect(() => {
-    const newStars = Array.from({ length: 35 }, (_, i) => ({
-      id: i, left: Math.random() * 100, top: Math.random() * 100, 
-      size: Math.random() * 1.5 + 0.8,
+    const newStars = Array.from({ length: 3 }, (_, i) => ({ // ลดเหลือ 3 ดวง
+      id: i, 
+      left: Math.random() * 90 + 5, // กันไม่ให้ชิดขอบเกินไป
+      top: Math.random() * 80 + 10, 
+      size: Math.random() * 0.5 + 0.5, // ลดขนาดลง (0.5 - 1.0 เท่า)
       animType: ['float', 'flyRight', 'flyUp', 'curvePath'][Math.floor(Math.random() * 4)],
-      duration: Math.random() * 20 + 5, delay: Math.random() * 10
+      duration: Math.random() * 20 + 10, // ช้าลงหน่อยให้ดู Relax
+      delay: Math.random() * 10
     }));
     setStars(newStars);
   }, []);
 
+  // ✅ Sun Logic: โชว์ 3 วิแรก แล้วรอ 1 ชม.
   useEffect(() => {
-    const activateSun = () => { setIsSunBig(true); setTimeout(() => setIsSunBig(false), 5000); };
-    activateSun();
-    const interval = setInterval(activateSun, 120000);
-    return () => clearInterval(interval);
+    // 1. เปิดมาโชว์เลย
+    setIsSunBig(true);
+    const initialHide = setTimeout(() => setIsSunBig(false), 3000); // 3 วินาทีหาย
+
+    // 2. Loop ทุก 1 ชั่วโมง
+    const interval = setInterval(() => {
+      setIsSunBig(true);
+      setTimeout(() => setIsSunBig(false), 3000); // โชว์ 3 วิ
+    }, 60 * 60 * 1000); // 1 ชั่วโมง (3,600,000 ms)
+
+    return () => {
+        clearTimeout(initialHide);
+        clearInterval(interval);
+    };
   }, []);
 
+  // Moon Logic
   useEffect(() => {
     const interval = setInterval(() => {
       setMoonRotation((prev) => {
@@ -427,6 +443,7 @@ export default function StarCatcherApp() {
              </DriftingText>
         </div>
 
+        {/* ☀️ Sun */}
         <div className="absolute top-10 left-4 md:left-20 pointer-events-auto z-40">
             <button onClick={() => handleItemClick('sun')} disabled={isProcessing}
                 className={`transition-all duration-500 flex flex-col items-center group ${isSunBig ? 'scale-150 cursor-pointer' : 'scale-75 cursor-default opacity-50 grayscale-[50%]'}`}>
@@ -435,7 +452,8 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        <div className="absolute top-10 right-4 md:right-20 pointer-events-auto z-40">
+        {/* 🌙 Moon (Moved continuously with CSS Animation) */}
+        <div className="absolute top-20 right-10 pointer-events-auto z-40 animate-[float_20s_infinite_linear]">
             <button onClick={() => handleItemClick('moon')} disabled={isProcessing}
                 className={`transition-all duration-700 flex flex-col items-center group ${isFullMoon ? 'scale-125 cursor-pointer' : 'scale-90 cursor-default opacity-80'}`}
                 style={{ transform: isFullMoon ? 'none' : `rotate(${moonRotation}deg)` }}>
@@ -448,6 +466,7 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
+        {/* ⭐ Stars */}
         <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
             {stars.map((star) => (
                 <button
