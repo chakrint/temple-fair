@@ -15,7 +15,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.3.2 (Visual Mode Indicator)";
+const APP_VERSION = "V.3.3 (Smooth Play)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
@@ -316,29 +316,59 @@ export default function StarCatcherApp() {
     attemptCatch("FREE", type, id);
   };
 
+  // ✅ V3.3 Updated attemptCatch (Skip Transaction for FREE mode)
   const attemptCatch = async (mode: "FREE" | "PAID", type: string, id?: string | number) => {
     setIsProcessing(true);
     setStatusMsg(mode === "FREE" ? "Checking Quota..." : "Paying 1 SLG...");
 
+    // 1. Check Quota (สำหรับเล่นฟรี)
     if (mode === "FREE") {
         const hasQuota = await checkAndIncrementQuota(userAddress);
         if (!hasQuota) {
             setIsProcessing(false);
-            setShowPayModal(true); 
-            return; 
+            setShowPayModal(true); // โควตาหมด -> จ่ายเงิน
+            return;
         }
+        
+        // 🟢 FIX: ถ้าเล่นฟรี (และโควตาผ่าน) ให้ข้าม Transaction ไปเลย!
+        // แค่หน่วงเวลาเล่นอนิเมชั่นนิดหน่อยพอ
         setStatusMsg("Catching...");
+        setTimeout(() => {
+            setIsProcessing(false);
+            setStatusMsg("");
+            finalizeCatch(type, id);
+        }, 800); // ดีเลย์ 0.8 วิ ให้ดูเหมือนโหลด
+        return; // จบการทำงานตรงนี้ ไม่ต้องไปเรียก MiniKit sendTransaction
     }
 
-    if (!MiniKit.isInstalled()) { setTimeout(() => { setIsProcessing(false); setStatusMsg(""); if (mode === "PAID") setShowPayModal(false); finalizeCatch(type, id); }, 2000); return; }
+    // 2. Mock Mode (เผื่อเทสบนคอมในโหมดจ่ายเงิน)
+    if (!MiniKit.isInstalled()) { 
+        setTimeout(() => { 
+            setIsProcessing(false); 
+            setStatusMsg(""); 
+            if (mode === "PAID") setShowPayModal(false); 
+            finalizeCatch(type, id); 
+        }, 2000); 
+        return; 
+    }
     
-    const txPayload = { transaction: [{ address: CONTRACT_ADDRESS, abi: [], functionName: mode === "FREE" ? "catchStarFree" : "catchStarPaid", args: [] }] };
+    // 3. Paid Mode Transaction (ทำงานเฉพาะตอนกดจ่ายเงิน 1 SLG)
+    const txPayload = { transaction: [{ address: CONTRACT_ADDRESS, abi: [], functionName: "catchStarPaid", args: [] }] };
     try {
         const res = await MiniKit.commands.sendTransaction(txPayload);
         if (res && ((res as any).status === 'success' || (res as any).transactionHash)) {
-            if (mode === "FREE") finalizeCatch(type, id); else { setShowPayModal(false); finalizeCatch(type, id); }
-        } else { if (mode === "FREE") setShowPayModal(true); } 
-    } catch (error) { if (mode === "FREE") setShowPayModal(true); else alert("Transaction Failed"); } finally { setIsProcessing(false); setStatusMsg(""); }
+            setShowPayModal(false); 
+            finalizeCatch(type, id);
+        } else { 
+            // จ่ายเงินไม่สำเร็จ หรือกดยกเลิก
+            // ไม่ต้องทำอะไร (หรือจะแจ้งเตือนก็ได้)
+        } 
+    } catch (error) { 
+        alert("Transaction Failed"); 
+    } finally { 
+        setIsProcessing(false); 
+        setStatusMsg(""); 
+    }
   };
 
   const finalizeCatch = (type: string, id?: string | number) => {
@@ -359,7 +389,7 @@ export default function StarCatcherApp() {
     <div className="min-h-screen bg-black text-white font-sans relative overflow-hidden cursor-grab active:cursor-grabbing selection:bg-pink-500">
       <TwinklingStars />
       
-      {/* ✅ TEST MODE INDICATOR BANNER */}
+      {/* TEST MODE INDICATOR */}
       {IS_TEST_MODE && (
         <div className="fixed top-0 left-0 w-full bg-yellow-500/90 text-black font-bold text-xs text-center py-1 z-50 shadow-md flex items-center justify-center gap-2">
             <AlertTriangle size={12} />
