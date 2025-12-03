@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { MiniKit } from '@worldcoin/minikit-js';
 import { 
   Sparkles, Star, Cloud, Candy, Flame, Stethoscope, 
@@ -11,7 +11,7 @@ import {
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.2.4 (Star Logic Fixed)";
+const APP_VERSION = "V.2.6 (Floating Logic)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
@@ -44,6 +44,70 @@ const DriftingText = ({ children, className }: { children: React.ReactNode, clas
   );
 };
 
+// --- 🌟 New Component: Floating Star (ดาวลอยแบบพิเศษ) ---
+const FloatingStar = ({ onCatch, disabled }: { onCatch: () => void, disabled: boolean }) => {
+    const [status, setStatus] = useState<'active' | 'cooldown'>('cooldown'); // เริ่มต้นที่ cooldown เพื่อสุ่มเวลาเกิด
+    const [style, setStyle] = useState<any>({});
+
+    useEffect(() => {
+        let timeout: NodeJS.Timeout;
+
+        if (status === 'cooldown') {
+            // 🕒 สุ่มเวลาเกิด 1-5 วินาที
+            const delay = Math.random() * 4000 + 1000; 
+            timeout = setTimeout(() => {
+                // สุ่มตำแหน่งใหม่ตอนเกิด
+                setStyle({
+                    left: `${Math.random() * 90 + 5}%`,
+                    top: `${Math.random() * 80 + 10}%`,
+                    size: Math.random() * 0.5 + 0.8, // ขนาด 0.8 - 1.3
+                });
+                setStatus('active');
+            }, delay);
+        } 
+        else if (status === 'active') {
+            // ⏳ แสดงผล 33 วินาที แล้วหายไป (เข้า cooldown)
+            timeout = setTimeout(() => {
+                setStatus('cooldown');
+            }, 33000);
+        }
+
+        return () => clearTimeout(timeout);
+    }, [status]);
+
+    const handleClick = () => {
+        if (disabled) return;
+        onCatch(); // เรียกฟังก์ชันจับ
+        setStatus('cooldown'); // หายไปทันทีเมื่อถูกจับ
+    };
+
+    if (status === 'cooldown') return null;
+
+    return (
+        <button
+            onClick={handleClick}
+            disabled={disabled}
+            className="absolute pointer-events-auto outline-none group hover:z-50 transition-all"
+            style={{ 
+                left: style.left, 
+                top: style.top,
+                // ✅ Animation: หมุน 3 รอบ (1080deg) ใน 33 วินาที + Fade In/Out
+                animation: `rotateFade 33s linear forwards` 
+            }}
+        >
+            <Star 
+                size={24 * style.size} 
+                className="text-yellow-100 fill-yellow-50/80 drop-shadow-[0_0_15px_rgba(255,255,200,0.8)]" 
+                strokeWidth={1.5} 
+            />
+            {/* Hand Icon show on hover */}
+            <div className="opacity-0 group-hover:opacity-100 absolute -bottom-1 -right-1 transition-opacity duration-200 pointer-events-none">
+                <Hand className="text-white drop-shadow-md rotate-[-20deg]" size={16} />
+            </div>
+        </button>
+    );
+};
+
 // --- 3. Main Page Component ---
 export default function StarCatcherApp() {
   const [lang, setLang] = useState<"th" | "en">("en");
@@ -56,7 +120,7 @@ export default function StarCatcherApp() {
   const [reward, setReward] = useState<any>(null);
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
   
-  const [stars, setStars] = useState<any[]>([]);
+  const [runningStars, setRunningStars] = useState<any[]>([]); // เปลี่ยนชื่อตัวแปรให้ชัดเจน
   const [isSunBig, setIsSunBig] = useState(false);
   const [moonRotation, setMoonRotation] = useState(0);
   const [isFullMoon, setIsFullMoon] = useState(false);
@@ -70,31 +134,18 @@ export default function StarCatcherApp() {
     }
   }, []);
 
-  // ✅ Stars Logic (Updated V2.4)
+  // ✅ Running Stars Logic: สุ่ม 3-8 ดวง (ดาววิ่งเร็ว)
   useEffect(() => {
     const newStars = [];
-    let idCounter = 0;
-
-    // 1. Floating Stars (ขยับน้อยๆ) - Fixed 3 ดวง
-    for (let i = 0; i < 3; i++) {
-        newStars.push({
-            id: idCounter++,
-            left: Math.random() * 90 + 5,
-            top: Math.random() * 80 + 10,
-            size: Math.random() * 0.5 + 0.5,
-            animType: 'float', // บังคับเป็น float
-            duration: Math.random() * 15 + 10,
-            delay: Math.random() * 5
-        });
-    }
-
-    // 2. Running Stars (ดาววิ่ง) - Random 3-8 ดวง
-    const runningCount = Math.floor(Math.random() * 6) + 3; // 3 ถึง 8
+    const RUNNING_STARS_MIN = 3;
+    const RUNNING_STARS_MAX = 8;
+    
+    const count = Math.floor(Math.random() * (RUNNING_STARS_MAX - RUNNING_STARS_MIN + 1)) + RUNNING_STARS_MIN;
     const moveTypes = ['flyRight', 'flyUp', 'curvePath'];
 
-    for (let i = 0; i < runningCount; i++) {
+    for (let i = 0; i < count; i++) {
         newStars.push({
-            id: idCounter++,
+            id: i,
             left: Math.random() * 90 + 5,
             top: Math.random() * 80 + 10,
             size: Math.random() * 0.5 + 0.5,
@@ -103,21 +154,17 @@ export default function StarCatcherApp() {
             delay: Math.random() * 10
         });
     }
-
-    setStars(newStars);
+    setRunningStars(newStars);
   }, []);
 
-  // ✅ Sun Logic: โชว์ 3 วิแรก แล้วรอ 1 ชม.
+  // Sun Logic
   useEffect(() => {
-    // 1. เปิดมาโชว์เลย
     setIsSunBig(true);
-    const initialHide = setTimeout(() => setIsSunBig(false), 3000); // 3 วินาทีหาย
-
-    // 2. Loop ทุก 1 ชั่วโมง
+    const initialHide = setTimeout(() => setIsSunBig(false), 3000); 
     const interval = setInterval(() => {
       setIsSunBig(true);
-      setTimeout(() => setIsSunBig(false), 3000); // โชว์ 3 วิ
-    }, 60 * 60 * 1000); // 1 ชั่วโมง
+      setTimeout(() => setIsSunBig(false), 3000); 
+    }, 60 * 60 * 1000); 
 
     return () => {
         clearTimeout(initialHide);
@@ -150,14 +197,14 @@ export default function StarCatcherApp() {
         canvas.width = size;
         canvas.height = size;
 
-        // 1. Background
+        // Background
         const gradient = ctx.createLinearGradient(0, 0, 0, size);
         gradient.addColorStop(0, '#0f172a');
         gradient.addColorStop(1, '#334155');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, size, size);
 
-        // 2. Decor
+        // Decor
         ctx.fillStyle = '#ffffff';
         for(let i=0; i<50; i++) {
             const x = Math.random() * size;
@@ -179,12 +226,12 @@ export default function StarCatcherApp() {
             });
         };
 
-        // โหลดรูป 2 อย่าง: ของรางวัล และ QR Code
+        // Load Images
         Promise.all([
             loadImage(rewardItem.img),
-            loadImage(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(APP_URL)}&color=000000&bgcolor=ffffff&margin=10`) // ✅ QR Code API
+            loadImage(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(APP_URL)}&color=000000&bgcolor=ffffff&margin=10`) 
         ]).then(([img, qrImg]) => {
-            // 3. Main Image
+            // Main Image
             const imgSize = 500;
             const x = (size - imgSize) / 2;
             const y = (size - imgSize) / 2 - 100;
@@ -194,26 +241,23 @@ export default function StarCatcherApp() {
             ctx.drawImage(img, x, y, imgSize, imgSize);
             ctx.shadowBlur = 0;
 
-            // 4. Reward Name
+            // Reward Name
             const name = lang === 'th' ? rewardItem.name.th : rewardItem.name.en;
             ctx.font = 'bold 80px sans-serif';
             ctx.fillStyle = '#fcd34d';
             ctx.textAlign = 'center';
             ctx.fillText(name, size/2, y + imgSize + 100);
 
-            // 5. Description
+            // Description
             const desc = lang === 'th' ? rewardItem.desc.th : rewardItem.desc.en;
             ctx.font = '40px sans-serif';
             ctx.fillStyle = '#e2e8f0';
             
-            // ✅ ปรับขนาด QR Code ให้เล็กลง (150px)
             const qrSize = 150; 
             const qrPadding = 40;
-
             const words = desc.split(' ');
             let line = '';
             let lineY = y + imgSize + 180;
-            // ✅ ปรับ maxWidth ให้ข้อความไม่ทับ QR Code
             const maxWidth = size - (qrSize + qrPadding * 2) - 100; 
 
             ctx.textAlign = 'left'; 
@@ -232,10 +276,10 @@ export default function StarCatcherApp() {
             }
             ctx.fillText(line, textX, lineY);
 
-            // 6. ✅ Draw QR Code (Right Bottom)
+            // QR Code
             ctx.drawImage(qrImg, size - qrSize - qrPadding, size - qrSize - qrPadding, qrSize, qrSize);
             
-            // 7. ✅ App Logo above QR Code
+            // App Logo
             ctx.textAlign = 'center';
             ctx.font = 'bold 24px monospace';
             ctx.fillStyle = '#64748b';
@@ -256,7 +300,6 @@ export default function StarCatcherApp() {
   const handleShare = async (fromModal = false) => {
     const shareUrl = typeof window !== 'undefined' ? window.location.origin : APP_URL;
     
-    // Default Share Data
     let shareData: any = {
         title: 'Star Catcher',
         text: lang === 'th' 
@@ -265,7 +308,6 @@ export default function StarCatcherApp() {
         url: shareUrl
     };
 
-    // Reward Share Data
     if (fromModal && reward) {
         setIsGeneratingCard(true);
         try {
@@ -346,10 +388,12 @@ export default function StarCatcherApp() {
     }
   };
 
-  const handleItemClick = async (type: 'star' | 'sun' | 'moon', id?: string | number) => {
+  const handleItemClick = async (type: 'star' | 'sun' | 'moon' | 'floating', id?: string | number) => {
     if (!userAddress) { handleConnect(); return; }
     if (type === 'sun' && !isSunBig) return;
     if (type === 'moon' && !isFullMoon) return;
+    
+    // สำหรับ Floating Star (ไม่ต้องส่ง ID เพราะจัดการภายใน component)
     setTargetItem({ type, id });
     attemptCatch("FREE", type, id);
   };
@@ -395,9 +439,11 @@ export default function StarCatcherApp() {
   };
 
   const finalizeCatch = (type: string, id?: string | number) => {
-      if (type === 'star' && id !== undefined) setStars((prev) => prev.filter((s) => s.id !== id));
+      // ถ้าเป็นดาววิ่ง (star) ให้ลบออกจาก array
+      if (type === 'star' && id !== undefined) setRunningStars((prev) => prev.filter((s) => s.id !== id));
       else if (type === 'sun') setIsSunBig(false);
       else if (type === 'moon') setIsFullMoon(false);
+      // ถ้าเป็น floating ไม่ต้องทำอะไร (Component จัดการตัวเอง)
 
       const rand = Math.random() * 100;
       let selectedId = 1;
@@ -475,7 +521,7 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        {/* 🌙 Moon (Moved continuously with CSS Animation) */}
+        {/* 🌙 Moon */}
         <div className="absolute top-20 right-10 pointer-events-auto z-40 animate-[float_20s_infinite_linear]">
             <button onClick={() => handleItemClick('moon')} disabled={isProcessing}
                 className={`transition-all duration-700 flex flex-col items-center group ${isFullMoon ? 'scale-125 cursor-pointer' : 'scale-90 cursor-default opacity-80'}`}
@@ -489,9 +535,9 @@ export default function StarCatcherApp() {
             </button>
         </div>
 
-        {/* ⭐ Stars */}
+        {/* 🌠 Running Stars (ดาววิ่ง 3-8 ดวง) */}
         <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
-            {stars.map((star) => (
+            {runningStars.map((star) => (
                 <button
                     key={star.id}
                     onClick={() => handleItemClick('star', star.id)}
@@ -508,6 +554,14 @@ export default function StarCatcherApp() {
                     </div>
                 </button>
             ))}
+        </div>
+
+        {/* ⭐ Floating Stars (ดาวลอยพิเศษ 3 ดวง) */}
+        <div className="absolute inset-0 w-full h-full pointer-events-none z-10">
+            {/* สร้างดาวลอย 3 ดวง */}
+            <FloatingStar onCatch={() => handleItemClick('floating')} disabled={isProcessing} />
+            <FloatingStar onCatch={() => handleItemClick('floating')} disabled={isProcessing} />
+            <FloatingStar onCatch={() => handleItemClick('floating')} disabled={isProcessing} />
         </div>
 
         <div className="absolute bottom-6 right-6 pointer-events-auto z-40 flex flex-col items-end gap-3">
@@ -582,6 +636,7 @@ export default function StarCatcherApp() {
         </div>
       )}
 
+      {/* ✅ Add New Animation Keyframes */}
       <style jsx global>{`
         .pause-on-hover:hover { animation-play-state: paused !important; }
         .animate-spin-slow { animation: spin 10s linear infinite; }
@@ -590,6 +645,13 @@ export default function StarCatcherApp() {
         @keyframes flyRight { 0% { transform: translate(-10vw, 0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translate(100vw, 20px); opacity: 0; } }
         @keyframes flyUp { 0% { transform: translate(0, 100vh); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(-20px, -20vh); opacity: 0; } }
         @keyframes curvePath { 0% { transform: translate(-50px, 0); opacity: 0; } 20% { opacity: 1; } 50% { transform: translate(30vw, -100px); } 80% { opacity: 1; } 100% { transform: translate(60vw, 50px); opacity: 0; } }
+        /* ✨ New Rotation & Fade Animation */
+        @keyframes rotateFade {
+            0% { opacity: 0; transform: rotate(0deg) scale(0.5); }
+            10% { opacity: 1; transform: rotate(108deg) scale(1); } /* Fade in quickly */
+            90% { opacity: 1; transform: rotate(972deg) scale(1); } /* Stay visible */
+            100% { opacity: 0; transform: rotate(1080deg) scale(0.5); } /* Fade out + 3rd round */
+        }
       `}</style>
     </div>
   );
