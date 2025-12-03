@@ -5,17 +5,15 @@ import { MiniKit } from '@worldcoin/minikit-js';
 import { 
   Sparkles, Star, Cloud, Candy, Flame, Stethoscope, 
   Cat, Bird, Sprout, Rocket, Zap, Crown, 
-  Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet
+  Hand, Heart, Coins, Sun, Moon, Circle, LogOut, Wallet, Share2, Download // ✅ เพิ่ม Download icon
 } from "lucide-react";
 
-// ✅ Import Component ดาววิบวับ (ใช้ @/ ตามที่ตั้งค่าใน tsconfig.json)
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.1.5 (Type Fixed)";
+const APP_VERSION = "V.1.7 (Save Image)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
-// ใส่ contract address จริงของคุณถ้ามี
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
 
 // --- 1. Database ของรางวัล ---
@@ -62,7 +60,6 @@ export default function StarCatcherApp() {
   const [moonRotation, setMoonRotation] = useState(0);
   const [isFullMoon, setIsFullMoon] = useState(false);
 
-  // Initialize MiniKit
   useEffect(() => {
     try {
         const appId = process.env.NEXT_PUBLIC_APP_ID || "app_staging_dummy";
@@ -73,7 +70,6 @@ export default function StarCatcherApp() {
     }
   }, []);
 
-  // Setup Stars
   useEffect(() => {
     const newStars = Array.from({ length: 35 }, (_, i) => ({
       id: i, left: Math.random() * 100, top: Math.random() * 100, 
@@ -84,7 +80,6 @@ export default function StarCatcherApp() {
     setStars(newStars);
   }, []);
 
-  // Sun & Moon Animation Loop
   useEffect(() => {
     const activateSun = () => { setIsSunBig(true); setTimeout(() => setIsSunBig(false), 5000); };
     activateSun();
@@ -105,9 +100,48 @@ export default function StarCatcherApp() {
   const toggleLang = () => setLang(prev => prev === "th" ? "en" : "th");
   const handleDisconnect = () => setUserAddress("");
 
-  // ✅ Connect Logic (Fixed Types)
+  const handleShare = async (fromModal = false) => {
+    const shareUrl = typeof window !== 'undefined' ? window.location.origin : "https://temple-fair.netlify.app";
+    let shareData = {
+        title: 'Star Catcher',
+        text: lang === 'th' ? 'มาคว้าดาวและสะสมของขวัญดิจิทัลกันเถอะ! ✨' : 'Catch stars and collect cute digital items with me! ✨',
+        url: shareUrl
+    };
+
+    if (fromModal && reward) {
+        const itemName = lang === 'th' ? reward.name.th : reward.name.en;
+        shareData.text = lang === 'th'
+            ? `ฉันจับได้ "${itemName}" ใน Star Catcher! 🌟 คุณจะจับได้อะไรนะ?`
+            : `I just caught a "${itemName}" in Star Catcher! 🌟 Can you find one too?`;
+    }
+
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+            await navigator.clipboard.writeText(shareData.url);
+            alert(lang === 'th' ? 'คัดลอกลิงก์เรียบร้อย!' : 'Link copied to clipboard!');
+        }
+    } catch (e) {
+        console.log("Share dismissed");
+    }
+  };
+
+  // ✅ New Download Function
+  const handleDownload = () => {
+    if (!reward || !reward.img) return;
+    
+    // สร้าง Link ปลอมๆ เพื่อกด Download
+    const link = document.createElement('a');
+    link.href = reward.img;
+    // ตั้งชื่อไฟล์ที่จะเซฟ (เช่น StarCatcher-Baby-Gold-Dragon.png)
+    link.download = `StarCatcher-${reward.name.en.replace(/\s+/g, '-')}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleConnect = async () => {
-    // 1. Mock Mode (Chrome)
     if (!MiniKit.isInstalled()) {
         console.log("Browser Mode: Mocking Login...");
         setUserAddress(MOCK_WALLET);
@@ -115,7 +149,6 @@ export default function StarCatcherApp() {
         return;
     }
 
-    // 2. Real World App Mode
     try {
         const res = await MiniKit.commands.walletAuth({
             nonce: crypto.randomUUID(),
@@ -124,7 +157,6 @@ export default function StarCatcherApp() {
             notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000),
         });
 
-        // ใช้ (res as any) เพื่อแก้ปัญหา Type Error: Property 'status' does not exist
         if (res && (res as any).status === 'success') {
              const addr = (res as any).address || (res as any).commandPayload?.address || "0xConnectedUser";
              setUserAddress(addr);
@@ -146,12 +178,10 @@ export default function StarCatcherApp() {
     attemptCatch("FREE", type, id);
   };
 
-  // ✅ Transaction Logic (Fixed Types)
   const attemptCatch = async (mode: "FREE" | "PAID", type: string, id?: string | number) => {
     setIsProcessing(true);
     setStatusMsg(mode === "FREE" ? "Catching..." : "Paying 1 SLG...");
 
-    // Mock Mode
     if (!MiniKit.isInstalled()) {
         setTimeout(() => {
              setIsProcessing(false);
@@ -162,11 +192,10 @@ export default function StarCatcherApp() {
         return;
     }
 
-    // Real Mode
     const txPayload = {
         transaction: [{
             address: CONTRACT_ADDRESS,
-            abi: [], // ใส่ ABI จริงที่นี่ถ้าต้องการ
+            abi: [], 
             functionName: mode === "FREE" ? "catchStarFree" : "catchStarPaid",
             args: []
         }]
@@ -175,12 +204,10 @@ export default function StarCatcherApp() {
     try {
         const res = await MiniKit.commands.sendTransaction(txPayload);
         
-        // ใช้ (res as any) เพื่อแก้ปัญหา Type Error
         if (res && ((res as any).status === 'success' || (res as any).transactionHash)) {
             if (mode === "FREE") finalizeCatch(type, id);
             else { setShowPayModal(false); finalizeCatch(type, id); }
         } else {
-             // User อาจจะกดยกเลิก
              if (mode === "FREE") setShowPayModal(true);
         }
     } catch (error) {
@@ -200,7 +227,6 @@ export default function StarCatcherApp() {
 
       const rand = Math.random() * 100;
       let selectedId = 1;
-      // Simple Rarity Logic
       if (type === 'sun') selectedId = Math.floor(Math.random() * 3) + 8;
       else if (type === 'moon') selectedId = Math.floor(Math.random() * 6) + 5;
       else {
@@ -311,11 +337,19 @@ export default function StarCatcherApp() {
             ))}
         </div>
 
-        {/* Donate & Version */}
-        <div className="absolute bottom-6 right-6 pointer-events-auto z-40 flex flex-col items-end gap-2">
+        {/* ✅ Bottom Right Buttons (Donate & Share) */}
+        <div className="absolute bottom-6 right-6 pointer-events-auto z-40 flex flex-col items-end gap-3">
+            
+            {/* Share Button */}
+            <button onClick={() => handleShare(false)} className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-full border border-white/20 transition-all backdrop-blur-sm">
+                <Share2 size={18} />
+            </button>
+
+            {/* Donate Button */}
             <button onClick={handleDonate} className="flex items-center gap-2 px-4 py-2 bg-pink-500/20 hover:bg-pink-500/80 text-pink-200 hover:text-white rounded-full border border-pink-500/50 transition-all text-xs font-bold backdrop-blur-sm">
                 <Heart size={14} className="fill-pink-500 text-pink-500" /> {lang === 'th' ? "สนับสนุน" : "Donate"}
             </button>
+            
             <span className="text-[10px] text-white/30 font-mono tracking-widest select-none">{APP_VERSION}</span>
         </div>
 
@@ -352,6 +386,17 @@ export default function StarCatcherApp() {
             <div className="absolute -top-4 right-8 bg-gray-900 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-white/20">
                 {reward.type}
             </div>
+            
+            {/* ✅ Action Buttons (Download & Share) */}
+            <div className="absolute top-4 left-4 flex gap-2">
+                <button onClick={handleDownload} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-all" title="Save Image">
+                    <Download size={14} />
+                </button>
+                <button onClick={() => handleShare(true)} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-all" title="Share Reward">
+                    <Share2 size={14} />
+                </button>
+            </div>
+
             <div className="mb-6 mt-2 flex justify-center">
                 {reward.img ? (
                     <img src={reward.img} alt={reward.name.en} className="w-40 h-40 object-contain drop-shadow-2xl animate-in zoom-in duration-300" />
