@@ -11,7 +11,7 @@ import {
 import TwinklingStars from "@/components/TwinklingStars"; 
 
 // --- 0. Config & Constants ---
-const APP_VERSION = "V.1.8 (Card Generator)";
+const APP_VERSION = "V.2.0 (Vercel Update)";
 const MOCK_WALLET = "0xMockWalletForChromeTesting";
 const CONTRACT_ADDRESS = "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8"; 
 const DEV_WALLET = "0xaf4af9ed673b706ef828d47c705979f52351bd21"; 
@@ -53,7 +53,7 @@ export default function StarCatcherApp() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [targetItem, setTargetItem] = useState<{ type: string, id?: string | number } | null>(null);
   const [reward, setReward] = useState<any>(null);
-  const [isGeneratingCard, setIsGeneratingCard] = useState(false); // สถานะตอนสร้างการ์ด
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false);
   
   const [stars, setStars] = useState<any[]>([]);
   const [isSunBig, setIsSunBig] = useState(false);
@@ -106,19 +106,18 @@ export default function StarCatcherApp() {
         const ctx = canvas.getContext('2d');
         if (!ctx) return resolve(null);
 
-        // ตั้งขนาดการ์ด (สี่เหลี่ยมจัตุรัสชัดๆ)
         const size = 1080;
         canvas.width = size;
         canvas.height = size;
 
-        // 1. วาดพื้นหลัง (Gradient สวยๆ)
+        // 1. Background
         const gradient = ctx.createLinearGradient(0, 0, 0, size);
-        gradient.addColorStop(0, '#0f172a'); // สีน้ำเงินเข้มเกือบดำ
-        gradient.addColorStop(1, '#334155'); // สีเทาอมฟ้า
+        gradient.addColorStop(0, '#0f172a');
+        gradient.addColorStop(1, '#334155');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, size, size);
 
-        // 2. วาดดาวตกแต่ง (Random Stars)
+        // 2. Decor
         ctx.fillStyle = '#ffffff';
         for(let i=0; i<50; i++) {
             const x = Math.random() * size;
@@ -129,43 +128,40 @@ export default function StarCatcherApp() {
             ctx.fill();
         }
 
-        // ฟังก์ชันโหลดรูป
+        // Load Image Helper
         const loadImage = (src: string) => {
             return new Promise<HTMLImageElement>((r) => {
                 const img = new Image();
-                img.crossOrigin = "Anonymous"; // สำคัญสำหรับรูปข้าม domain
+                img.crossOrigin = "Anonymous";
                 img.src = src;
                 img.onload = () => r(img);
-                img.onerror = () => r(img); // กัน error
+                img.onerror = () => r(img);
             });
         };
 
-        // เริ่มวาดรูปและข้อความ
         loadImage(rewardItem.img).then((img) => {
-            // 3. วาดรูปของรางวัลตรงกลาง
+            // 3. Main Image
             const imgSize = 500;
             const x = (size - imgSize) / 2;
-            const y = (size - imgSize) / 2 - 100; // ขยับขึ้นหน่อย
+            const y = (size - imgSize) / 2 - 100;
             
-            // วาดเงาหลังรูป
             ctx.shadowColor = "rgba(255, 255, 255, 0.5)";
             ctx.shadowBlur = 50;
             ctx.drawImage(img, x, y, imgSize, imgSize);
-            ctx.shadowBlur = 0; // Reset shadow
+            ctx.shadowBlur = 0;
 
-            // 4. วาดชื่อรางวัล
+            // 4. Reward Name
             const name = lang === 'th' ? rewardItem.name.th : rewardItem.name.en;
             ctx.font = 'bold 80px sans-serif';
-            ctx.fillStyle = '#fcd34d'; // สีเหลืองทอง
+            ctx.fillStyle = '#fcd34d';
             ctx.textAlign = 'center';
             ctx.fillText(name, size/2, y + imgSize + 100);
 
-            // 5. วาดคำอวยพร
+            // 5. Description
             const desc = lang === 'th' ? rewardItem.desc.th : rewardItem.desc.en;
             ctx.font = '40px sans-serif';
-            ctx.fillStyle = '#e2e8f0'; // สีขาวควันบุหรี่
+            ctx.fillStyle = '#e2e8f0';
             
-            // ตัดคำยาวๆ (Wrap Text แบบง่ายๆ)
             const words = desc.split(' ');
             let line = '';
             let lineY = y + imgSize + 180;
@@ -184,12 +180,11 @@ export default function StarCatcherApp() {
             }
             ctx.fillText(line, size/2, lineY);
 
-            // 6. วาดโลโก้แอพเล็กๆ ด้านล่าง
+            // 6. App Logo
             ctx.font = 'bold 30px monospace';
             ctx.fillStyle = '#64748b';
             ctx.fillText("Star Catcher", size/2, size - 50);
 
-            // 7. แปลงเป็นไฟล์
             canvas.toBlob((blob) => {
                 if(blob) {
                     const file = new File([blob], `card-${Date.now()}.png`, { type: 'image/png' });
@@ -202,50 +197,65 @@ export default function StarCatcherApp() {
     });
   };
 
-  // ✅ ฟังก์ชันแชร์แบบใหม่ (แชร์ไฟล์ภาพ)
+  // ✅ ฟังก์ชันแชร์แบบใหม่ (เพิ่มข้อความเชิญชวน)
   const handleShare = async (fromModal = false) => {
-    // ถ้าแชร์ลิงก์หน้าแรก (แบบไม่มีรางวัล)
-    if (!fromModal || !reward) {
-        const shareUrl = typeof window !== 'undefined' ? window.location.origin : "https://temple-fair.netlify.app";
-        const shareData = {
-            title: 'Star Catcher',
-            text: lang === 'th' ? 'มาคว้าดาวกัน! ✨' : 'Catch stars with me! ✨',
-            url: shareUrl
-        };
+    // ✅ ใช้ Vercel URL ตามที่แจ้ง
+    const shareUrl = typeof window !== 'undefined' ? window.location.origin : "https://temple-fair.vercel.app";
+    
+    // Default Share Data (หน้าแรก)
+    let shareData: any = {
+        title: 'Star Catcher',
+        text: lang === 'th' 
+            ? `มาคว้าดาวกัน! ✨ เล่นฟรี ลุ้นรับของขวัญดิจิทัลน่ารักๆ 👇\n${shareUrl}`
+            : `Catch stars with me! ✨ Play for free and collect cute digital items 👇\n${shareUrl}`,
+        url: shareUrl
+    };
+
+    // Reward Share Data (มีรูป + คำอวยพร)
+    if (fromModal && reward) {
+        setIsGeneratingCard(true);
         try {
-            if (navigator.share) await navigator.share(shareData);
-            else await navigator.clipboard.writeText(shareData.url);
-        } catch(e) {}
+            const file = await generateCardImage(reward);
+            const itemName = lang === 'th' ? reward.name.th : reward.name.en;
+            
+            // 🌟 ข้อความอวยพร + ลิงก์
+            const blessingText = lang === 'th'
+                ? `เพื่อนคุณส่งคำอวยพรมาให้พร้อมกับ "${itemName}" 🎁\nขอให้สิ่งดีๆ เกิดขึ้นกับคุณนะ! ✨\n\nมาลองคว้าดาวของคุณบ้างที่นี่เลย 👇\n${shareUrl}`
+                : `Your friend sent you a blessing with "${itemName}" 🎁\nWishing you all the best! ✨\n\nCatch your own star here 👇\n${shareUrl}`;
+
+            if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Gift from the Stars',
+                    text: blessingText,
+                    // url: shareUrl // บาง OS ถ้าแนบไฟล์แล้ว url อาจไม่ขึ้น เลยรวมใน text ไปเลยชัวร์กว่า
+                });
+            } else {
+                // กรณีแชร์ไฟล์ไม่ได้ (Fallback)
+                shareData.text = blessingText;
+                await navigator.share(shareData);
+            }
+        } catch (e) {
+            // ถ้าแชร์ไม่ได้จริงๆ (เช่น User กดปิด หรือ Browser ไม่รองรับ)
+            console.log("Share dismissed/failed, falling back to clipboard");
+            try {
+                await navigator.clipboard.writeText(shareData.text);
+                alert(lang === 'th' ? 'คัดลอกข้อความแล้ว! ส่งให้เพื่อนได้เลย' : 'Message copied! Ready to send.');
+            } catch(err) {}
+        } finally {
+            setIsGeneratingCard(false);
+        }
         return;
     }
 
-    // ถ้าแชร์รางวัล -> สร้างการ์ด
-    setIsGeneratingCard(true);
+    // กรณีแชร์หน้าแรก
     try {
-        const file = await generateCardImage(reward);
-        if (file) {
-            // เช็คว่าแชร์ไฟล์ได้ไหม (Mobile ส่วนใหญ่ได้)
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: 'My Star Catcher Reward',
-                    text: lang === 'th' ? `ฉันได้ ${reward.name.th} ล่ะ! ✨` : `I got ${reward.name.en}! ✨`
-                });
-            } else {
-                // ถ้าแชร์ไฟล์ไม่ได้ (เช่น บนคอม) ให้โหลดแทน
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(file);
-                link.download = file.name;
-                link.click();
-                alert(lang === 'th' ? 'บันทึกการ์ดเรียบร้อย!' : 'Card saved!');
-            }
+        if (navigator.share) await navigator.share(shareData);
+        else {
+            await navigator.clipboard.writeText(shareData.text);
+            alert(lang === 'th' ? 'คัดลอกลิงก์แล้ว!' : 'Link copied!');
         }
-    } catch (e) {
-        console.error("Share failed", e);
-        alert("Could not create card image");
-    } finally {
-        setIsGeneratingCard(false);
-    }
+    } catch(e) {}
   };
 
   const handleDownload = async () => {
@@ -261,7 +271,6 @@ export default function StarCatcherApp() {
     setIsGeneratingCard(false);
   };
 
-  // ... (ฟังก์ชัน Connect และอื่นๆ เหมือนเดิม) ...
   const handleConnect = async () => {
     if (!MiniKit.isInstalled()) {
         console.log("Browser Mode: Mocking Login...");
