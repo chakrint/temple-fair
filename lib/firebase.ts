@@ -1,13 +1,15 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+
+// ✅ ใช้ process.env เพื่อดึงค่าจาก Vercel
 const firebaseConfig = {
-  apiKey: "AIzaSyBgY8LtzHjWazxYgqBLrFDm0wDwIAsbjfw",
-  authDomain: "starcatcher-s.firebaseapp.com",
-  projectId: "starcatcher-s",
-  storageBucket: "starcatcher-s.firebasestorage.app",
-  messagingSenderId: "638666794776",
-  appId: "1:638666794776:web:010a6ebbdab77a6a37606d",
-  measurementId: "G-7C07T1GKBX"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // เริ่มต้นระบบ Firebase
